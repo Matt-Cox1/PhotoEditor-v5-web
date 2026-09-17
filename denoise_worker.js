@@ -1,6 +1,9 @@
 import * as ort from "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/ort.webgpu.bundle.min.mjs";
 
-const MODEL_URL = new URL("./models/scunet_color_real_psnr.onnx", self.location.href).href;
+const MODEL_URL = new URL(
+  "./models/scunet_color_real_psnr_single.onnx",
+  self.location.href,
+).href;
 const CORE = 256;
 const CONTEXT = 64;
 

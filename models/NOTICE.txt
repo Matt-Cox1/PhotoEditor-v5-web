@@ -4,4 +4,6 @@ Source: https://huggingface.co/Heliosoph/scunet-onnx
 Upstream project: https://github.com/cszn/SCUNet
 License: Apache-2.0
 
-The hosted files are scunet_color_real_psnr.onnx and its external data file.
+The hosted file is scunet_color_real_psnr_single.onnx. Its external weights
+were merged into the ONNX file because ONNX Runtime Web does not resolve
+external data files in all browser execution providers.
