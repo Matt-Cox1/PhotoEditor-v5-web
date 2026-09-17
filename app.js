@@ -29,9 +29,10 @@ const workLabel = document.getElementById("workLabel");
 const workBar = document.getElementById("workBar");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
-const denoiseWorker = new Worker(new URL("./denoise_worker.js", import.meta.url), {
-  type: "module",
-});
+const denoiseWorker = new Worker(
+  new URL("./denoise_worker.js?v=denoise-2", import.meta.url),
+  { type: "module" },
+);
 
 const state = {
   photo: null,
