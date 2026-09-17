@@ -39,6 +39,7 @@ const state = {
   reference: null,
   recipe: null,
   result: null,
+  denoised: false,
   workerReady: false,
   busy: false,
 };
@@ -127,6 +128,7 @@ photoInput.addEventListener("change", async () => {
     state.photo = await loadRaster(file);
     state.recipe = null;
     state.result = null;
+    state.denoised = false;
     drawRaster(photoCanvas, state.photo);
     drawRaster(beforeCanvas, state.photo);
     clearCanvas(afterCanvas);
@@ -181,7 +183,7 @@ function updateButtons() {
   const hasPhoto = Boolean(state.photo);
   generateButton.disabled = state.busy || !hasPhoto || !apiKeyInput.value.trim();
   matchButton.disabled = state.busy || !hasPhoto || !state.reference || !state.workerReady;
-  denoiseButton.disabled = state.busy || !hasPhoto;
+  denoiseButton.disabled = state.busy || !hasPhoto || state.denoised;
   strengthInput.disabled = state.busy || !state.recipe;
   saveButton.disabled = state.busy || !state.result;
   wipeInput.disabled = !state.result;
@@ -299,6 +301,7 @@ async function denoisePhoto() {
     height: message.height,
     values: message.values,
   });
+  state.denoised = true;
   state.recipe = null;
   state.result = null;
   drawRaster(photoCanvas, state.photo);
