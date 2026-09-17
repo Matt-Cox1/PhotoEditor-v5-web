@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PhotoEditor V5 match</title>
-  <link rel="stylesheet" href="./styles.css?v=denoise-20">
+  <link rel="stylesheet" href="./styles.css?v=denoise-21">
 </head>
 <body>
   <main class="app-shell">
@@ -151,6 +151,11 @@
         </button>
         <span id="referenceNotice" class="key-warning">Generated AI references retain OpenAI's invisible watermark.</span>
       </div>
+      <details id="promptDetails" class="prompt-details" hidden>
+        <summary>View prompt sent to OpenAI</summary>
+        <pre id="promptText" class="prompt-text"></pre>
+        <p id="promptMeta" class="key-warning"></p>
+      </details>
     </section>
 
     <section class="panel step-panel">
@@ -234,6 +239,6 @@
     </div>
     <p id="status" class="status" role="status">Load a photo to start.</p>
   </main>
-  <script type="module" src="./app.js?v=denoise-20"></script>
+  <script type="module" src="./app.js?v=denoise-21"></script>
 </body>
 </html>

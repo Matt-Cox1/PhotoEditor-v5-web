@@ -31,6 +31,9 @@ const photoMeta = document.getElementById("photoMeta");
 const referenceMeta = document.getElementById("referenceMeta");
 const saveReference = document.getElementById("saveReference");
 const referenceNotice = document.getElementById("referenceNotice");
+const promptDetails = document.getElementById("promptDetails");
+const promptText = document.getElementById("promptText");
+const promptMeta = document.getElementById("promptMeta");
 const referenceDrop = document.getElementById("referenceDrop");
 const denoiseMode = document.getElementById("denoiseMode");
 const generateButton = document.getElementById("generate");
@@ -61,7 +64,7 @@ const cancelWork = document.getElementById("cancelWork");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-20", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-21", import.meta.url),
   { type: "module" },
 );
 
@@ -76,6 +79,8 @@ const state = {
   referenceBytes: null,
   referenceGenerated: false,
   referenceFileName: "",
+  referencePrompt: "",
+  referenceMeta: "",
   denoised: false,
   workerReady: false,
   busy: false,
@@ -178,6 +183,8 @@ photoInput.addEventListener("change", async () => {
     state.referenceBytes = null;
     state.referenceGenerated = false;
     state.referenceFileName = "";
+    state.referencePrompt = "";
+    state.referenceMeta = "";
     state.recipe = null;
     state.result = null;
     state.denoised = false;
@@ -206,6 +213,8 @@ referenceInput.addEventListener("change", async () => {
     state.referenceBytes = new Uint8Array(await file.arrayBuffer());
     state.referenceGenerated = false;
     state.referenceFileName = file.name;
+    state.referencePrompt = "";
+    state.referenceMeta = "";
     updateReferenceControls();
   });
 });
@@ -244,6 +253,8 @@ document.body.addEventListener("drop", async (event) => {
     state.referenceBytes = new Uint8Array(await file.arrayBuffer());
     state.referenceGenerated = false;
     state.referenceFileName = file.name;
+    state.referencePrompt = "";
+    state.referenceMeta = "";
     updateReferenceControls();
   });
 });
@@ -592,6 +603,8 @@ async function generateReference() {
   state.referenceBytes = imagePng;
   state.referenceGenerated = true;
   state.referenceFileName = `${state.suggestedFileName || "photo"}-ai-reference.png`;
+  state.referencePrompt = referencePrompt.prompt;
+  state.referenceMeta = `${IMAGE_MODEL} · medium quality · ${new Date().toLocaleString()}`;
   setWork("Loading the generated reference…", 90);
   const raster = await pngToRaster(imagePng);
   await setReference(raster, "Generated reference is ready. Match color and light next.");
@@ -779,6 +792,9 @@ function updateReferenceControls() {
   referenceNotice.textContent = state.referenceGenerated
     ? "This AI-generated reference retains OpenAI's invisible watermark."
     : "Generated AI references retain OpenAI's invisible watermark.";
+  promptDetails.hidden = !state.referencePrompt;
+  promptText.textContent = state.referencePrompt;
+  promptMeta.textContent = state.referenceMeta;
 }
 
 async function saveReferenceFile() {

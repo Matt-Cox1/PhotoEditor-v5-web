@@ -282,6 +282,35 @@ input[type="file"] {
   min-height: 2.2rem;
   font-size: 0.78rem;
 }
+.prompt-details {
+  margin-top: 0.7rem;
+}
+.prompt-details > summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+.prompt-details > summary:hover {
+  color: #fff;
+}
+.prompt-text {
+  max-height: 16rem;
+  margin: 0.6rem 0 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: #101318;
+  color: #cdd5dd;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  padding: 0.7rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.prompt-details .key-warning {
+  margin: 0.5rem 0 0;
+}
 .field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
