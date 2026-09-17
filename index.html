@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PhotoEditor V5 match</title>
-  <link rel="stylesheet" href="./styles.css?v=denoise-15">
+  <link rel="stylesheet" href="./styles.css?v=denoise-16">
 </head>
 <body>
   <main class="app-shell">
@@ -124,6 +124,7 @@
               <input id="rememberKey" type="checkbox">
               Remember on this device
             </label>
+            <button id="checkConnection" class="clear-key" type="button" disabled>Test connection</button>
             <button id="clearKey" class="clear-key" type="button" disabled>Clear saved key</button>
           </span>
           <span class="key-warning">Stored in this browser only. Page scripts and browser extensions can read it.</span>
@@ -221,6 +222,6 @@
     </section>
     <p id="status" class="status" role="status">Load a photo to start.</p>
   </main>
-  <script type="module" src="./app.js?v=denoise-15"></script>
+  <script type="module" src="./app.js?v=denoise-16"></script>
 </body>
 </html>

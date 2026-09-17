@@ -25,6 +25,7 @@ const referenceInput = document.getElementById("reference");
 const apiKeyInput = document.getElementById("apiKey");
 const rememberKey = document.getElementById("rememberKey");
 const clearKey = document.getElementById("clearKey");
+const checkConnection = document.getElementById("checkConnection");
 const intentInput = document.getElementById("intent");
 const photoMeta = document.getElementById("photoMeta");
 const referenceMeta = document.getElementById("referenceMeta");
@@ -56,7 +57,7 @@ const cancelWork = document.getElementById("cancelWork");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-15", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-16", import.meta.url),
   { type: "module" },
 );
 
@@ -331,6 +332,7 @@ function updateButtons() {
   compare.dataset.hasResult = hasResult ? "true" : "false";
   wipeInput.disabled = !hasResult;
   clearKey.disabled = !rememberKey.checked || !apiKeyInput.value.trim();
+  checkConnection.disabled = state.busy || !apiKeyInput.value.trim();
   zoomOut.disabled = !hasResult || viewerZoom <= 1;
   zoomIn.disabled = !hasResult || viewerZoom >= 3;
   zoomReset.disabled = !hasResult || viewerZoom === 1;
@@ -358,6 +360,7 @@ clearKey.addEventListener("click", () => {
   updateButtons();
   setStatus("Saved API key cleared from this browser.");
 });
+checkConnection.addEventListener("click", () => run(checkOpenAiConnection));
 restoreApiKey();
 updateButtons();
 
@@ -555,6 +558,27 @@ async function generateReference() {
   setWork("Loading the generated reference…", 90);
   const raster = await pngToRaster(imagePng);
   await setReference(raster, "Generated reference is ready. Match color and light next.");
+}
+
+async function checkOpenAiConnection() {
+  const key = apiKeyInput.value.trim();
+  if (!key) {
+    throw new Error("Enter an OpenAI API key first.");
+  }
+  setWork("Checking the OpenAI connection…", 25);
+  const response = await openaiFetch(
+    `${OPENAI}/models`,
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${key}` },
+    },
+    20_000,
+  );
+  if (!response.ok) {
+    throw new Error(openaiMessage(response.status));
+  }
+  setWork("OpenAI connection is working.", 100);
+  setStatus("OpenAI connection is working. No photo was sent.");
 }
 
 async function autoEdit() {
