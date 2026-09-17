@@ -4,10 +4,35 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PhotoEditor V5 match</title>
-  <link rel="stylesheet" href="./styles.css?v=denoise-12">
+  <link rel="stylesheet" href="./styles.css?v=denoise-13">
 </head>
 <body>
   <main class="app-shell">
+    <nav class="menu-bar" aria-label="Application menu">
+      <span class="menu-brand">PhotoEditor</span>
+      <details class="menu-item">
+        <summary>Photo</summary>
+        <div class="menu-popover">
+          <button id="menuOpen" type="button">Open photo</button>
+          <button id="menuSave" type="button" disabled>Save PNG</button>
+        </div>
+      </details>
+      <details class="menu-item">
+        <summary>Edit</summary>
+        <div class="menu-popover">
+          <button id="menuAutoEdit" type="button" disabled>Auto Edit</button>
+          <button id="menuAdvanced" type="button">Show Advanced</button>
+        </div>
+      </details>
+      <details class="menu-item">
+        <summary>View</summary>
+        <div class="menu-popover">
+          <button id="menuZoomIn" type="button">Zoom in</button>
+          <button id="menuZoomOut" type="button">Zoom out</button>
+          <button id="menuZoomReset" type="button">Reset zoom</button>
+        </div>
+      </details>
+    </nav>
     <header class="hero">
       <p class="eyebrow">Private browser photo tools</p>
       <h1>Shape the light. Keep the pixels.</h1>
@@ -38,6 +63,27 @@
       <p id="photoMeta" class="meta">No photo selected</p>
     </section>
 
+    <section class="panel auto-panel">
+      <div>
+        <p class="eyebrow">One-step workflow</p>
+        <h2>Auto Edit</h2>
+        <p class="auto-description">
+          Denoise the photo, generate a target when an API key is available,
+          and apply the color and light match.
+        </p>
+      </div>
+      <button id="autoEdit" class="button button-primary auto-button" type="button" disabled>
+        Auto Edit
+      </button>
+      <p class="auto-note">
+        With an API key, Auto Edit sends a resized preview to OpenAI. Without
+        one, it runs the local denoise pass only.
+      </p>
+    </section>
+
+    <details id="advancedControls" class="advanced">
+      <summary>Advanced controls</summary>
+      <div class="advanced-content">
     <section class="panel step-panel">
       <div class="step-heading">
         <span class="step-number">2</span>
@@ -121,6 +167,8 @@
         </label>
       </div>
     </section>
+      </div>
+    </details>
 
     <section id="work" class="work panel" hidden aria-live="polite">
       <div class="work-row">
@@ -172,6 +220,6 @@
     </section>
     <p id="status" class="status" role="status">Load a photo to start.</p>
   </main>
-  <script type="module" src="./app.js?v=denoise-12"></script>
+  <script type="module" src="./app.js?v=denoise-13"></script>
 </body>
 </html>

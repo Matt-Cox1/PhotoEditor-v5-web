@@ -12,6 +12,15 @@ const OPENAI = "https://api.openai.com/v1";
 const API_KEY_STORAGE = "photoeditor.openai.apiKey.v1";
 
 const photoInput = document.getElementById("photo");
+const autoEditButton = document.getElementById("autoEdit");
+const advancedControls = document.getElementById("advancedControls");
+const menuOpen = document.getElementById("menuOpen");
+const menuSave = document.getElementById("menuSave");
+const menuAutoEdit = document.getElementById("menuAutoEdit");
+const menuAdvanced = document.getElementById("menuAdvanced");
+const menuZoomIn = document.getElementById("menuZoomIn");
+const menuZoomOut = document.getElementById("menuZoomOut");
+const menuZoomReset = document.getElementById("menuZoomReset");
 const referenceInput = document.getElementById("reference");
 const apiKeyInput = document.getElementById("apiKey");
 const rememberKey = document.getElementById("rememberKey");
@@ -46,7 +55,7 @@ const workBar = document.getElementById("workBar");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-12", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-13", import.meta.url),
   { type: "module" },
 );
 
@@ -210,6 +219,7 @@ document.body.addEventListener("drop", async (event) => {
 });
 
 generateButton.addEventListener("click", () => run(generateReference));
+autoEditButton.addEventListener("click", () => run(autoEdit));
 matchButton.addEventListener("click", () => run(matchPhoto));
 denoiseButton.addEventListener("click", () => run(denoisePhoto));
 saveButton.addEventListener("click", () => run(savePng));
@@ -229,6 +239,16 @@ wipeInput.addEventListener("input", () => {
 zoomOut.addEventListener("click", () => setViewerZoom(viewerZoom - 0.25));
 zoomIn.addEventListener("click", () => setViewerZoom(viewerZoom + 0.25));
 zoomReset.addEventListener("click", () => setViewerZoom(1));
+menuOpen.addEventListener("click", () => photoInput.click());
+menuSave.addEventListener("click", () => run(savePng));
+menuAutoEdit.addEventListener("click", () => run(autoEdit));
+menuAdvanced.addEventListener("click", () => {
+  advancedControls.open = true;
+  advancedControls.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+menuZoomIn.addEventListener("click", () => setViewerZoom(viewerZoom + 0.25));
+menuZoomOut.addEventListener("click", () => setViewerZoom(viewerZoom - 0.25));
+menuZoomReset.addEventListener("click", () => setViewerZoom(1));
 compare.addEventListener("wheel", (event) => {
   if (!state.result) {
     return;
@@ -289,6 +309,9 @@ compare.addEventListener("pointercancel", endViewerPan);
 
 function updateButtons() {
   const hasPhoto = Boolean(state.photo);
+  autoEditButton.disabled = state.busy || !hasPhoto;
+  menuAutoEdit.disabled = state.busy || !hasPhoto;
+  menuSave.disabled = state.busy || !state.result;
   const hasResult = Boolean(state.result);
   generateButton.disabled = state.busy || !hasPhoto || !apiKeyInput.value.trim();
   matchButton.disabled = state.busy || !hasPhoto || !state.reference || !state.workerReady;
@@ -520,6 +543,33 @@ async function generateReference() {
   setWork("Loading the generated reference…", 90);
   const raster = await pngToRaster(imagePng);
   await setReference(raster, "Generated reference is ready. Match color and light next.");
+}
+
+async function autoEdit() {
+  if (!state.photo) {
+    throw new Error("Load a photo first.");
+  }
+  const hasKey = Boolean(apiKeyInput.value.trim());
+  if (hasKey && !state.reference) {
+    const approved = window.confirm(
+      "Auto Edit will send a resized photo preview to OpenAI. Your API account may be charged. Continue?",
+    );
+    if (!approved) {
+      setStatus("Auto Edit cancelled before the OpenAI request.");
+      return;
+    }
+  }
+  if (!state.denoised) {
+    await denoisePhoto();
+  }
+  if (!state.reference && hasKey) {
+    await generateReference();
+  }
+  if (state.reference) {
+    await matchPhoto();
+  } else {
+    setStatus("Local denoise finished. Add an API key or reference to match color and light.");
+  }
 }
 
 async function matchPhoto() {

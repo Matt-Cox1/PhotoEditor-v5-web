@@ -25,6 +25,71 @@ body {
   display: grid;
   gap: 1rem;
 }
+.menu-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 2.3rem;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+.menu-brand {
+  margin-right: 0.7rem;
+  color: #f2f4f7;
+  font-size: 0.85rem;
+  font-weight: 750;
+}
+.menu-item {
+  position: relative;
+}
+.menu-item summary {
+  border-radius: 0.35rem;
+  cursor: pointer;
+  list-style: none;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.78rem;
+}
+.menu-item summary::-webkit-details-marker {
+  display: none;
+}
+.menu-item summary:hover,
+.menu-item[open] summary {
+  background: #ffffff10;
+  color: #fff;
+}
+.menu-popover {
+  position: absolute;
+  top: 2.1rem;
+  left: 0;
+  z-index: 10;
+  display: grid;
+  min-width: 10rem;
+  gap: 0.2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: #1b2027;
+  box-shadow: 0 0.8rem 2rem #0008;
+  padding: 0.35rem;
+}
+.menu-popover button {
+  border: 0;
+  border-radius: 0.3rem;
+  background: transparent;
+  color: #e7ebef;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.45rem 0.55rem;
+  text-align: left;
+  white-space: nowrap;
+}
+.menu-popover button:hover:not(:disabled) {
+  background: #ffffff12;
+}
+.menu-popover button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
 .hero {
   padding: 0.5rem 0.25rem 1rem;
 }
@@ -71,6 +136,51 @@ h2 {
   background: var(--accent);
   box-shadow: 0 0 0 0.2rem #b9e7ca22;
 }
+.auto-panel {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.7rem 1rem;
+  border-color: #617469;
+  background: linear-gradient(135deg, #172019, var(--panel));
+}
+.auto-description,
+.auto-note {
+  max-width: 40rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.83rem;
+  line-height: 1.45;
+}
+.auto-button {
+  min-width: 9rem;
+  min-height: 3.2rem;
+  font-size: 1rem;
+}
+.auto-note {
+  grid-column: 1 / -1;
+  color: #8f9e94;
+  font-size: 0.72rem;
+}
+.advanced {
+  display: grid;
+  gap: 0.8rem;
+}
+.advanced > summary {
+  width: max-content;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 700;
+  list-style-position: inside;
+}
+.advanced > summary:hover {
+  color: #fff;
+}
+.advanced-content {
+  display: grid;
+  gap: 1rem;
+}
 .panel {
   border: 1px solid var(--line);
   border-radius: 0.9rem;
@@ -112,6 +222,7 @@ h2 {
 }
 .file-drop,
 .reference-drop {
+  position: relative;
   display: grid;
   min-height: 7rem;
   place-items: center;
@@ -386,6 +497,7 @@ canvas {
 .compare-frame {
   position: relative;
   min-height: 5rem;
+  aspect-ratio: 4 / 3;
   overflow: hidden;
   border-radius: 0.55rem;
   background: #080a0c;
@@ -397,8 +509,8 @@ canvas {
 }
 .compare-stage {
   position: relative;
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
+  height: 100%;
   transform: scale(1);
   transform-origin: center center;
   transition: transform 140ms ease;
@@ -420,6 +532,7 @@ canvas {
   pointer-events: none;
 }
 .viewer-label-after {
+  top: 3.4rem;
   right: 0.7rem;
 }
 .viewer-label-before {
@@ -469,7 +582,14 @@ canvas {
   opacity: 0.38;
 }
 .compare-frame canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   border: 0;
+}
+#afterCanvas {
+  position: absolute;
+  inset: 0;
 }
 #beforeCanvas {
   position: absolute;
@@ -519,6 +639,9 @@ canvas {
   background: var(--accent);
   box-shadow: 0 0 0 2px #ffffff;
 }
+#wipe:disabled {
+  visibility: hidden;
+}
 .wipe-divider {
   position: absolute;
   top: 0;
@@ -529,6 +652,11 @@ canvas {
   background: #ffffff;
   box-shadow: 0 0 0 1px #0d0f1288;
   pointer-events: none;
+}
+.compare-frame[data-has-result="false"] .viewer-label-after,
+.compare-frame[data-has-result="false"] .wipe-divider,
+.compare-frame[data-has-result="false"] .zoom-controls {
+  visibility: hidden;
 }
 .status {
   min-height: 1.25rem;
@@ -563,6 +691,12 @@ canvas {
   .field-grid,
   .viewer-layout {
     grid-template-columns: 1fr;
+  }
+  .auto-panel {
+    grid-template-columns: 1fr;
+  }
+  .auto-button {
+    width: 100%;
   }
   .viewer-side {
     grid-template-columns: repeat(2, minmax(0, 1fr));
