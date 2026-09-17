@@ -52,10 +52,11 @@ const zoomValue = document.getElementById("zoomValue");
 const workEl = document.getElementById("work");
 const workLabel = document.getElementById("workLabel");
 const workBar = document.getElementById("workBar");
+const cancelWork = document.getElementById("cancelWork");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-14", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-15", import.meta.url),
   { type: "module" },
 );
 
@@ -73,6 +74,8 @@ const state = {
 let pending = null;
 let denoisePending = null;
 let strengthTimer = 0;
+let activeRequestController = null;
+let cancelRequested = false;
 let viewerZoom = 1;
 let viewerPanX = 0;
 let viewerPanY = 0;
@@ -249,6 +252,13 @@ menuAdvanced.addEventListener("click", () => {
 menuZoomIn.addEventListener("click", () => setViewerZoom(viewerZoom + 0.25));
 menuZoomOut.addEventListener("click", () => setViewerZoom(viewerZoom - 0.25));
 menuZoomReset.addEventListener("click", () => setViewerZoom(1));
+cancelWork.addEventListener("click", () => {
+  if (activeRequestController) {
+    cancelRequested = true;
+    activeRequestController.abort();
+    setStatus("Cancelling the OpenAI request…");
+  }
+});
 compare.addEventListener("wheel", (event) => {
   if (!state.result) {
     return;
@@ -393,6 +403,7 @@ function removePersistedApiKey() {
 function setWork(label, percent) {
   workEl.hidden = false;
   workLabel.textContent = label;
+  cancelWork.disabled = !activeRequestController;
   setStatus(label);
   if (percent == null || Number.isNaN(percent)) {
     workBar.removeAttribute("value");
@@ -479,6 +490,7 @@ function pointerDistance(first, second) {
 function hideWork() {
   workEl.hidden = true;
   workBar.removeAttribute("value");
+  cancelWork.disabled = true;
 }
 
 async function run(task) {
@@ -536,7 +548,7 @@ async function generateReference() {
   setWork("Preparing a preview for OpenAI…", 10);
   const preview = resizeRaster(state.photo, GENERATE_MAX);
   const png = await rasterToPng(preview);
-  setWork("Writing the reference prompt…");
+  setWork("Writing the reference prompt… (up to 90 seconds)");
   const prompt = await writePrompt(png, intentInput.value, key);
   setWork("Generating the AI target reference…");
   const imagePng = await editImage(png, prompt, key);
@@ -937,17 +949,33 @@ function openaiMessage(status) {
   return `OpenAI rejected the request (HTTP ${status}).`;
 }
 
-async function openaiFetch(url, options) {
+async function openaiFetch(url, options, timeoutMs = 90_000) {
+  const controller = new AbortController();
+  activeRequestController = controller;
+  cancelWork.disabled = false;
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   let response;
   try {
-    response = await fetch(url, options);
+    response = await fetch(url, { ...options, signal: controller.signal });
   } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(
+        cancelRequested
+          ? "The OpenAI request was cancelled."
+          : "OpenAI did not respond within the time limit. Check the connection and try again.",
+      );
+    }
     if (isCorsFailure(error)) {
       throw new Error(
         "The browser blocked the OpenAI request (CORS or network). Drop a reference image instead. Match still runs on this device."
       );
     }
     throw error;
+  } finally {
+    window.clearTimeout(timeout);
+    activeRequestController = null;
+    cancelWork.disabled = true;
+    cancelRequested = false;
   }
   return response;
 }
@@ -1074,7 +1102,7 @@ async function editImage(png, prompt, key) {
     method: "POST",
     headers: { Authorization: `Bearer ${key}` },
     body: form,
-  });
+  }, 300_000);
   if (!response.ok) {
     throw new Error(openaiMessage(response.status));
   }
