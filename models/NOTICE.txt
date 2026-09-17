@@ -1,0 +1,7 @@
+SCUNet real-world PSNR checkpoint
+
+Source: https://huggingface.co/Heliosoph/scunet-onnx
+Upstream project: https://github.com/cszn/SCUNet
+License: Apache-2.0
+
+The hosted files are scunet_color_real_psnr.onnx and its external data file.

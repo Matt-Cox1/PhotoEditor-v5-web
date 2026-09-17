@@ -45,6 +45,9 @@ button:disabled, input:disabled {
   gap: 0.65rem;
   align-items: end;
 }
+button {
+  cursor: pointer;
+}
 .previews {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -1,5 +1,5 @@
-# PhotoEditor V5 match (web)
+# PhotoEditor V5 web demo
 
-Static page. Photos stay in your browser except when you Generate a reference (that call goes to OpenAI with your key).
+This public static site runs Hierarchical V5 in the browser. It also includes the Apache-2.0 SCUNet real-world PSNR ONNX checkpoint for optional local denoising.
 
-If Generate is blocked by the browser, drop a reference image and run Match anyway.
+Photos stay in the browser except when the visitor explicitly uses Generate, which sends a resized preview to OpenAI with the visitor's own API key. Denoise and Match run locally.

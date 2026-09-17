@@ -14,6 +14,7 @@ const apiKeyInput = document.getElementById("apiKey");
 const intentInput = document.getElementById("intent");
 const generateButton = document.getElementById("generate");
 const matchButton = document.getElementById("match");
+const denoiseButton = document.getElementById("denoise");
 const saveButton = document.getElementById("save");
 const strengthInput = document.getElementById("strength");
 const wipeInput = document.getElementById("wipe");
@@ -28,6 +29,9 @@ const workLabel = document.getElementById("workLabel");
 const workBar = document.getElementById("workBar");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
+const denoiseWorker = new Worker(new URL("./denoise_worker.js", import.meta.url), {
+  type: "module",
+});
 
 const state = {
   photo: null,
@@ -39,6 +43,7 @@ const state = {
 };
 
 let pending = null;
+let denoisePending = null;
 let strengthTimer = 0;
 
 worker.onmessage = (event) => {
@@ -68,6 +73,42 @@ worker.onerror = (event) => {
   if (pending) {
     pending.reject(new Error(message));
     pending = null;
+  } else {
+    setStatus(message);
+  }
+};
+
+denoiseWorker.onmessage = (event) => {
+  const message = event.data;
+  if (message.type === "status") {
+    setWork(message.message);
+    return;
+  }
+  if (message.type === "progress") {
+    setWork(
+      `Denoising locally… tile ${message.completed} of ${message.total}`,
+      message.percent,
+    );
+    return;
+  }
+  if (!denoisePending) {
+    return;
+  }
+  if (message.type === "error") {
+    denoisePending.reject(new Error(message.message));
+  } else {
+    denoisePending.resolve(message);
+  }
+  denoisePending = null;
+};
+
+denoiseWorker.onerror = (event) => {
+  const message =
+    event.message ||
+    "The denoise worker failed. Reload the page and try again.";
+  if (denoisePending) {
+    denoisePending.reject(new Error(message));
+    denoisePending = null;
   } else {
     setStatus(message);
   }
@@ -120,6 +161,7 @@ document.body.addEventListener("drop", async (event) => {
 
 generateButton.addEventListener("click", () => run(generateReference));
 matchButton.addEventListener("click", () => run(matchPhoto));
+denoiseButton.addEventListener("click", () => run(denoisePhoto));
 saveButton.addEventListener("click", () => run(savePng));
 strengthInput.addEventListener("input", () => {
   if (!state.recipe || !state.photo) {
@@ -138,6 +180,7 @@ function updateButtons() {
   const hasPhoto = Boolean(state.photo);
   generateButton.disabled = state.busy || !hasPhoto || !apiKeyInput.value.trim();
   matchButton.disabled = state.busy || !hasPhoto || !state.reference || !state.workerReady;
+  denoiseButton.disabled = state.busy || !hasPhoto;
   strengthInput.disabled = state.busy || !state.recipe;
   saveButton.disabled = state.busy || !state.result;
   wipeInput.disabled = !state.result;
@@ -236,6 +279,36 @@ async function matchPhoto() {
   await applyStrength();
 }
 
+async function denoisePhoto() {
+  if (!state.photo) {
+    throw new Error("Load a photo first.");
+  }
+  setWork("Preparing a 1024px denoise copy…", 5);
+  const preview = resizeRaster(state.photo, 1024);
+  const message = await callDenoise({
+    type: "denoise",
+    width: preview.width,
+    height: preview.height,
+    values: preview.values,
+    strength: 1,
+  });
+  setWork("Upsampling the denoise correction to the original size…", 92);
+  state.photo = applyDenoiseResidual(state.photo, preview, {
+    width: message.width,
+    height: message.height,
+    values: message.values,
+  });
+  state.recipe = null;
+  state.result = null;
+  drawRaster(photoCanvas, state.photo);
+  drawRaster(beforeCanvas, state.photo);
+  clearCanvas(afterCanvas);
+  setWork(`Denoise finished using ${message.backend}.`, 100);
+  setStatus(
+    `Denoise finished using ${message.backend}. The cleaned photo stays on this device.`,
+  );
+}
+
 async function applyStrength() {
   if (!state.photo || !state.recipe) {
     throw new Error("Match a reference before adjusting strength.");
@@ -284,6 +357,95 @@ function callWorker(message) {
     pending = { resolve, reject };
     worker.postMessage(message);
   });
+}
+
+function callDenoise(message) {
+  return new Promise((resolve, reject) => {
+    denoisePending = { resolve, reject };
+    denoiseWorker.postMessage(message);
+  });
+}
+
+function applyDenoiseResidual(full, lowSource, lowDenoised) {
+  const residual = new Float32Array(lowDenoised.values.length);
+  const lowLuma = new Float32Array(lowSource.width * lowSource.height);
+  for (let pixel = 0; pixel < lowSource.width * lowSource.height; pixel += 1) {
+    const offset = pixel * 3;
+    residual[offset] =
+      srgbDecode(lowDenoised.values[offset]) - srgbDecode(lowSource.values[offset]);
+    residual[offset + 1] =
+      srgbDecode(lowDenoised.values[offset + 1]) -
+      srgbDecode(lowSource.values[offset + 1]);
+    residual[offset + 2] =
+      srgbDecode(lowDenoised.values[offset + 2]) -
+      srgbDecode(lowSource.values[offset + 2]);
+    lowLuma[pixel] = luminance(lowSource.values, offset);
+  }
+
+  const values = new Float32Array(full.values.length);
+  for (let y = 0; y < full.height; y += 1) {
+    const lowY = (y / Math.max(1, full.height - 1)) * (lowSource.height - 1);
+    const y0 = Math.floor(lowY);
+    const y1 = Math.min(lowSource.height - 1, y0 + 1);
+    for (let x = 0; x < full.width; x += 1) {
+      const lowX = (x / Math.max(1, full.width - 1)) * (lowSource.width - 1);
+      const x0 = Math.floor(lowX);
+      const x1 = Math.min(lowSource.width - 1, x0 + 1);
+      const fullOffset = (y * full.width + x) * 3;
+      const fullLuma = luminance(full.values, fullOffset);
+      const samples = [
+        [x0, y0, (1 - (lowX - x0)) * (1 - (lowY - y0))],
+        [x1, y0, (lowX - x0) * (1 - (lowY - y0))],
+        [x0, y1, (1 - (lowX - x0)) * (lowY - y0)],
+        [x1, y1, (lowX - x0) * (lowY - y0)],
+      ];
+      const correction = [0, 0, 0];
+      let totalWeight = 0;
+      for (const [sampleX, sampleY, spatialWeight] of samples) {
+        const samplePixel = sampleY * lowSource.width + sampleX;
+        const edgeWeight =
+          spatialWeight *
+          Math.exp(-4 * Math.abs(fullLuma - lowLuma[samplePixel]));
+        const residualOffset = samplePixel * 3;
+        for (let channel = 0; channel < 3; channel += 1) {
+          correction[channel] += edgeWeight * residual[residualOffset + channel];
+        }
+        totalWeight += edgeWeight;
+      }
+      const originalLinear = [
+        srgbDecode(full.values[fullOffset]),
+        srgbDecode(full.values[fullOffset + 1]),
+        srgbDecode(full.values[fullOffset + 2]),
+      ];
+      for (let channel = 0; channel < 3; channel += 1) {
+        values[fullOffset + channel] = srgbEncode(
+          originalLinear[channel] + correction[channel] / Math.max(totalWeight, 1e-8),
+        );
+      }
+    }
+  }
+  return { width: full.width, height: full.height, values };
+}
+
+function srgbDecode(value) {
+  return value <= 0.04045
+    ? value / 12.92
+    : ((value + 0.055) / 1.055) ** 2.4;
+}
+
+function srgbEncode(value) {
+  const clamped = Math.max(0, Math.min(1, value));
+  return clamped <= 0.0031308
+    ? 12.92 * clamped
+    : 1.055 * clamped ** (1 / 2.4) - 0.055;
+}
+
+function luminance(values, offset) {
+  return (
+    0.2126 * srgbDecode(values[offset]) +
+    0.7152 * srgbDecode(values[offset + 1]) +
+    0.0722 * srgbDecode(values[offset + 2])
+  );
 }
 
 function assertAspect(photo, reference) {
