@@ -4,75 +4,146 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PhotoEditor V5 match</title>
-  <link rel="stylesheet" href="./styles.css?v=denoise-5">
+  <link rel="stylesheet" href="./styles.css?v=denoise-6">
 </head>
 <body>
-  <main>
-    <h1>Hierarchical V5 match</h1>
-    <p class="lede">
-      The photo stays in this tab. Generate sends a resized preview to OpenAI with your key.
-      Denoise and Match run on your device. If the browser blocks OpenAI (CORS), drop a reference instead.
-    </p>
+  <main class="app-shell">
+    <header class="hero">
+      <p class="eyebrow">Private browser photo tools</p>
+      <h1>Shape the light. Keep the pixels.</h1>
+      <p class="lede">
+        Denoise and color matching run on your device. Only Generate sends a
+        resized preview to OpenAI with your key.
+      </p>
+      <div class="privacy-note">
+        <span class="privacy-dot" aria-hidden="true"></span>
+        Your photo is not uploaded to this site.
+      </div>
+    </header>
 
-    <label class="file">
-      Photo
-      <input id="photo" type="file" accept="image/*">
-    </label>
-    <div class="previews">
-      <figure>
-        <figcaption>Photo</figcaption>
-        <canvas id="photoCanvas"></canvas>
-      </figure>
-      <figure>
-        <figcaption>Reference</figcaption>
-        <canvas id="referenceCanvas"></canvas>
-      </figure>
-    </div>
-
-    <label>
-      OpenAI API key
-      <input id="apiKey" type="password" autocomplete="off" spellcheck="false">
-    </label>
-    <label>
-      Desired look (optional)
-      <textarea id="intent" rows="3" placeholder="Warm late light, keep the original framing."></textarea>
-    </label>
-    <div class="row">
-      <button id="generate" type="button" disabled>Generate AI target reference</button>
-      <label class="file">
-        Drop or choose a reference
-        <input id="reference" type="file" accept="image/*">
+    <section class="panel step-panel">
+      <div class="step-heading">
+        <span class="step-number">1</span>
+        <div>
+          <h2>Choose a photo</h2>
+          <p>Use a JPEG or PNG. The original stays in this browser tab.</p>
+        </div>
+      </div>
+      <label class="file-drop photo-drop" for="photo">
+        <span class="drop-icon" aria-hidden="true">＋</span>
+        <span class="drop-title">Choose a photo</span>
+        <span class="drop-subtitle">or drop one anywhere on the page</span>
+        <input id="photo" type="file" accept="image/*">
       </label>
-    </div>
+      <p id="photoMeta" class="meta">No photo selected</p>
+    </section>
 
-    <div class="row">
-      <button id="match" type="button" disabled>Match color and light</button>
-      <button id="denoise" type="button" disabled>Denoise locally</button>
-      <label class="strength">
-        Strength
-        <input id="strength" type="range" min="0" max="1" step="0.01" value="1" disabled>
-      </label>
-      <button id="save" type="button" disabled>Save PNG</button>
-    </div>
+    <section class="panel step-panel">
+      <div class="step-heading">
+        <span class="step-number">2</span>
+        <div>
+          <h2>Clean it up locally <span class="optional">Optional</span></h2>
+          <p>SCUNet removes real-world noise with WebGPU or a WASM fallback.</p>
+        </div>
+      </div>
+      <div class="action-line">
+        <button id="denoise" class="button button-secondary" type="button" disabled>
+          Denoise locally
+        </button>
+        <span class="action-note">First use downloads about 74 MB.</span>
+      </div>
+    </section>
 
-    <div id="work" class="work" hidden>
+    <section class="panel step-panel">
+      <div class="step-heading">
+        <span class="step-number">3</span>
+        <div>
+          <h2>Create a target reference</h2>
+          <p>Generate a look with OpenAI, or bring your own reference image.</p>
+        </div>
+      </div>
+      <div class="field-grid">
+        <label class="field">
+          <span>OpenAI API key <span class="optional">needed for Generate</span></span>
+          <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…">
+        </label>
+        <label class="field">
+          <span>Desired look <span class="optional">optional</span></span>
+          <textarea id="intent" rows="2" placeholder="Warm late light, keep the original framing."></textarea>
+        </label>
+      </div>
+      <div class="reference-actions">
+        <button id="generate" class="button button-primary" type="button" disabled>
+          Generate AI target
+        </button>
+        <label id="referenceDrop" class="reference-drop" for="reference">
+          <span class="drop-title">Drop or choose a reference</span>
+          <span class="drop-subtitle">The reference guides color and light only.</span>
+          <input id="reference" type="file" accept="image/*">
+        </label>
+      </div>
+      <p id="referenceMeta" class="meta">No reference selected</p>
+    </section>
+
+    <section class="panel step-panel">
+      <div class="step-heading">
+        <span class="step-number">4</span>
+        <div>
+          <h2>Match and save</h2>
+          <p>V5 transfers color and light without replacing your source pixels.</p>
+        </div>
+      </div>
+      <div class="action-line">
+        <button id="match" class="button button-primary" type="button" disabled>
+          Match color and light
+        </button>
+        <button id="save" class="button button-secondary" type="button" disabled>
+          Save PNG
+        </button>
+        <label class="strength">
+          <span>Match strength <output id="strengthValue">100%</output></span>
+          <input id="strength" type="range" min="0" max="1" step="0.01" value="1" disabled>
+        </label>
+      </div>
+    </section>
+
+    <section id="work" class="work panel" hidden aria-live="polite">
       <div class="work-row">
         <span class="spinner" aria-hidden="true"></span>
         <span id="workLabel">Working…</span>
       </div>
       <progress id="workBar" max="100"></progress>
-    </div>
+    </section>
 
-    <figure class="compare">
-      <figcaption>Result (drag to compare)</figcaption>
-      <div id="compare" class="compare-frame">
-        <canvas id="afterCanvas"></canvas>
-        <canvas id="beforeCanvas"></canvas>
-        <input id="wipe" type="range" min="0" max="100" value="50" disabled>
+    <section class="panel preview-panel">
+      <div class="preview-header">
+        <div>
+          <p class="eyebrow">Preview</p>
+          <h2>Compare your result</h2>
+        </div>
+        <span class="compare-hint">Drag the slider to compare</span>
       </div>
-    </figure>
-    <p id="status" role="status">Load a photo to start.</p>
+      <div class="previews">
+        <figure>
+          <figcaption>Working photo</figcaption>
+          <canvas id="photoCanvas"></canvas>
+        </figure>
+        <figure>
+          <figcaption>Target reference</figcaption>
+          <canvas id="referenceCanvas"></canvas>
+        </figure>
+      </div>
+      <figure class="compare">
+        <figcaption>Before / after</figcaption>
+        <div id="compare" class="compare-frame">
+          <canvas id="afterCanvas"></canvas>
+          <canvas id="beforeCanvas"></canvas>
+          <input id="wipe" type="range" min="0" max="100" value="50" disabled aria-label="Before and after split">
+        </div>
+      </figure>
+    </section>
+    <p id="status" class="status" role="status">Load a photo to start.</p>
   </main>
-  <script type="module" src="./app.js?v=denoise-5"></script>
+  <script type="module" src="./app.js?v=denoise-6"></script>
 </body>
 </html>

@@ -12,11 +12,15 @@ const photoInput = document.getElementById("photo");
 const referenceInput = document.getElementById("reference");
 const apiKeyInput = document.getElementById("apiKey");
 const intentInput = document.getElementById("intent");
+const photoMeta = document.getElementById("photoMeta");
+const referenceMeta = document.getElementById("referenceMeta");
+const referenceDrop = document.getElementById("referenceDrop");
 const generateButton = document.getElementById("generate");
 const matchButton = document.getElementById("match");
 const denoiseButton = document.getElementById("denoise");
 const saveButton = document.getElementById("save");
 const strengthInput = document.getElementById("strength");
+const strengthValue = document.getElementById("strengthValue");
 const wipeInput = document.getElementById("wipe");
 const statusEl = document.getElementById("status");
 const photoCanvas = document.getElementById("photoCanvas");
@@ -30,7 +34,7 @@ const workBar = document.getElementById("workBar");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-2", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-6", import.meta.url),
   { type: "module" },
 );
 
@@ -88,7 +92,7 @@ denoiseWorker.onmessage = (event) => {
   }
   if (message.type === "progress") {
     setWork(
-      `Denoising locally… tile ${message.completed} of ${message.total}`,
+      `Denoising locally… tile ${message.completed} of ${message.total} · ${message.alignment}px windows`,
       message.percent,
     );
     return;
@@ -129,6 +133,7 @@ photoInput.addEventListener("change", async () => {
     state.recipe = null;
     state.result = null;
     state.denoised = false;
+    photoMeta.textContent = `${formatDimensions(state.photo)} · ready`;
     drawRaster(photoCanvas, state.photo);
     drawRaster(beforeCanvas, state.photo);
     clearCanvas(afterCanvas);
@@ -148,12 +153,32 @@ referenceInput.addEventListener("change", async () => {
   });
 });
 
+for (const eventName of ["dragenter", "dragover"]) {
+  referenceDrop.addEventListener(eventName, (event) => {
+    event.preventDefault();
+    referenceDrop.classList.add("is-dragging");
+  });
+}
+for (const eventName of ["dragleave", "drop"]) {
+  referenceDrop.addEventListener(eventName, (event) => {
+    event.preventDefault();
+    referenceDrop.classList.remove("is-dragging");
+  });
+}
+
 compare.addEventListener("dragover", (event) => event.preventDefault());
 document.body.addEventListener("dragover", (event) => event.preventDefault());
 document.body.addEventListener("drop", async (event) => {
   event.preventDefault();
   const file = event.dataTransfer?.files?.[0];
   if (!file || !file.type.startsWith("image/")) {
+    return;
+  }
+  if (!state.photo) {
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    photoInput.files = transfer.files;
+    photoInput.dispatchEvent(new Event("change", { bubbles: true }));
     return;
   }
   await run(async () => {
@@ -167,6 +192,7 @@ matchButton.addEventListener("click", () => run(matchPhoto));
 denoiseButton.addEventListener("click", () => run(denoisePhoto));
 saveButton.addEventListener("click", () => run(savePng));
 strengthInput.addEventListener("input", () => {
+  strengthValue.textContent = `${Math.round(Number(strengthInput.value) * 100)}%`;
   if (!state.recipe || !state.photo) {
     return;
   }
@@ -193,6 +219,7 @@ apiKeyInput.addEventListener("input", updateButtons);
 
 function setStatus(text) {
   statusEl.textContent = text;
+  statusEl.dataset.state = "info";
 }
 
 function setWork(label, percent) {
@@ -223,6 +250,7 @@ async function run(task) {
     await task();
   } catch (error) {
     setStatus(error instanceof Error ? error.message : String(error));
+    statusEl.dataset.state = "error";
   } finally {
     hideWork();
     state.busy = false;
@@ -238,6 +266,7 @@ async function setReference(raster, message) {
   state.recipe = null;
   state.result = null;
   drawRaster(referenceCanvas, raster);
+  referenceMeta.textContent = `${formatDimensions(raster)} · ready`;
   clearCanvas(afterCanvas);
   updateButtons();
   setStatus(message);
@@ -286,7 +315,7 @@ async function denoisePhoto() {
   if (!state.photo) {
     throw new Error("Load a photo first.");
   }
-  setWork("Preparing a 1024px denoise copy…", 5);
+  setWork("Preparing a 1024px denoise copy… tiles use 64px windows", 5);
   const preview = resizeRaster(state.photo, 1024);
   const message = await callDenoise({
     type: "denoise",
@@ -302,6 +331,7 @@ async function denoisePhoto() {
     values: message.values,
   });
   state.denoised = true;
+  photoMeta.textContent = `${formatDimensions(state.photo)} · denoised locally`;
   state.recipe = null;
   state.result = null;
   drawRaster(photoCanvas, state.photo);
@@ -577,6 +607,10 @@ function rasterToPng(raster) {
 async function pngToRaster(bytes) {
   const blob = new Blob([bytes], { type: "image/png" });
   return loadRaster(blob);
+}
+
+function formatDimensions(raster) {
+  return `${raster.width.toLocaleString()} × ${raster.height.toLocaleString()} px`;
 }
 
 function clamp01(value) {

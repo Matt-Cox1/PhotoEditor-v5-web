@@ -6,6 +6,7 @@ const MODEL_URL = new URL(
 ).href;
 const CORE = 256;
 const CONTEXT = 64;
+const MODEL_ALIGNMENT = 64;
 
 let sessionPromise;
 
@@ -56,10 +57,18 @@ async function denoise(width, height, source, strength) {
       const bottom = Math.min(height, y1 + CONTEXT);
       const inputWidth = right - left;
       const inputHeight = bottom - top;
-      const paddedWidth = roundUp(inputWidth, 8);
-      const paddedHeight = roundUp(inputHeight, 8);
+      const paddedWidth = roundUp(inputWidth, MODEL_ALIGNMENT);
+      const paddedHeight = roundUp(inputHeight, MODEL_ALIGNMENT);
       const input = makeTensor(source, width, height, left, top, paddedWidth, paddedHeight);
-      const result = await session.run({ [session.inputNames[0]]: input });
+      let result;
+      try {
+        result = await session.run({ [session.inputNames[0]]: input });
+      } catch (error) {
+        throw new Error(
+          `SCUNet failed on a ${paddedWidth}×${paddedHeight} tile using ${session.backend}. ` +
+            `${formatError(error)} Reload the page if the model cache may be incomplete.`,
+        );
+      }
       const prediction = result[session.outputNames[0]].data;
       copyCore(
         output,
@@ -83,6 +92,8 @@ async function denoise(width, height, source, strength) {
         completed,
         total,
         percent: (completed / total) * 100,
+        backend: session.backend,
+        alignment: MODEL_ALIGNMENT,
       });
     }
   }
