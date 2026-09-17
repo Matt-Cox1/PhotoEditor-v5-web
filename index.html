@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PhotoEditor V5 match</title>
-  <link rel="stylesheet" href="./styles.css?v=denoise-8">
+  <link rel="stylesheet" href="./styles.css?v=denoise-9">
 </head>
 <body>
   <main class="app-shell">
@@ -66,6 +66,14 @@
         <label class="field">
           <span>OpenAI API key <span class="optional">needed for Generate</span></span>
           <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…">
+          <span class="key-options">
+            <label class="check-label">
+              <input id="rememberKey" type="checkbox">
+              Remember on this device
+            </label>
+            <button id="clearKey" class="clear-key" type="button" disabled>Clear saved key</button>
+          </span>
+          <span class="key-warning">Stored in this browser only. Page scripts and browser extensions can read it.</span>
         </label>
         <label class="field">
           <span>Desired look <span class="optional">optional</span></span>
@@ -156,6 +164,6 @@
     </section>
     <p id="status" class="status" role="status">Load a photo to start.</p>
   </main>
-  <script type="module" src="./app.js?v=denoise-8"></script>
+  <script type="module" src="./app.js?v=denoise-9"></script>
 </body>
 </html>

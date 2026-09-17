@@ -9,10 +9,13 @@ const DENOISE_MAX = 1536;
 const FIT_MAX = 720;
 const DISPLAY_MAX = 1600;
 const OPENAI = "https://api.openai.com/v1";
+const API_KEY_STORAGE = "photoeditor.openai.apiKey.v1";
 
 const photoInput = document.getElementById("photo");
 const referenceInput = document.getElementById("reference");
 const apiKeyInput = document.getElementById("apiKey");
+const rememberKey = document.getElementById("rememberKey");
+const clearKey = document.getElementById("clearKey");
 const intentInput = document.getElementById("intent");
 const photoMeta = document.getElementById("photoMeta");
 const referenceMeta = document.getElementById("referenceMeta");
@@ -41,7 +44,7 @@ const workBar = document.getElementById("workBar");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-8", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-9", import.meta.url),
   { type: "module" },
 );
 
@@ -60,6 +63,9 @@ let pending = null;
 let denoisePending = null;
 let strengthTimer = 0;
 let viewerZoom = 1;
+let viewerPanX = 0;
+let viewerPanY = 0;
+let panPointer = null;
 
 worker.onmessage = (event) => {
   const message = event.data;
@@ -147,6 +153,7 @@ photoInput.addEventListener("change", async () => {
     drawRaster(photoCanvas, state.photo);
     drawRaster(beforeCanvas, state.beforePreview);
     clearCanvas(afterCanvas);
+    resetViewer();
     setWork("Photo loaded", 100);
     setStatus("Photo loaded. Generate a reference or drop one, then match.");
   });
@@ -217,6 +224,39 @@ wipeInput.addEventListener("input", () => {
 zoomOut.addEventListener("click", () => setViewerZoom(viewerZoom - 0.25));
 zoomIn.addEventListener("click", () => setViewerZoom(viewerZoom + 0.25));
 zoomReset.addEventListener("click", () => setViewerZoom(1));
+compare.addEventListener("wheel", (event) => {
+  if (!state.result) {
+    return;
+  }
+  event.preventDefault();
+  const rect = compare.getBoundingClientRect();
+  const direction = event.deltaY < 0 ? 0.25 : -0.25;
+  setViewerZoom(viewerZoom + direction, event.clientX - rect.left, event.clientY - rect.top);
+}, { passive: false });
+compare.addEventListener("pointerdown", (event) => {
+  if (viewerZoom <= 1 || event.target.closest("input, button")) {
+    return;
+  }
+  panPointer = {
+    id: event.pointerId,
+    x: event.clientX,
+    y: event.clientY,
+    panX: viewerPanX,
+    panY: viewerPanY,
+  };
+  compare.setPointerCapture(event.pointerId);
+  compare.classList.add("is-panning");
+});
+compare.addEventListener("pointermove", (event) => {
+  if (!panPointer || event.pointerId !== panPointer.id) {
+    return;
+  }
+  viewerPanX = panPointer.panX + event.clientX - panPointer.x;
+  viewerPanY = panPointer.panY + event.clientY - panPointer.y;
+  applyViewerTransform();
+});
+compare.addEventListener("pointerup", endViewerPan);
+compare.addEventListener("pointercancel", endViewerPan);
 
 function updateButtons() {
   const hasPhoto = Boolean(state.photo);
@@ -226,16 +266,73 @@ function updateButtons() {
   strengthInput.disabled = state.busy || !state.recipe;
   saveButton.disabled = state.busy || !state.result;
   wipeInput.disabled = !state.result;
+  clearKey.disabled = !rememberKey.checked || !apiKeyInput.value.trim();
   zoomOut.disabled = !state.result || viewerZoom <= 1;
   zoomIn.disabled = !state.result || viewerZoom >= 3;
   zoomReset.disabled = !state.result || viewerZoom === 1;
 }
 
-apiKeyInput.addEventListener("input", updateButtons);
+apiKeyInput.addEventListener("input", () => {
+  if (rememberKey.checked) {
+    persistApiKey();
+  }
+  updateButtons();
+});
+rememberKey.addEventListener("change", () => {
+  if (rememberKey.checked) {
+    persistApiKey();
+  } else {
+    removePersistedApiKey();
+  }
+  updateButtons();
+});
+clearKey.addEventListener("click", () => {
+  removePersistedApiKey();
+  apiKeyInput.value = "";
+  rememberKey.checked = false;
+  updateButtons();
+  setStatus("Saved API key cleared from this browser.");
+});
+restoreApiKey();
+updateButtons();
 
 function setStatus(text) {
   statusEl.textContent = text;
   statusEl.dataset.state = "info";
+}
+
+function restoreApiKey() {
+  try {
+    const saved = localStorage.getItem(API_KEY_STORAGE);
+    if (saved) {
+      apiKeyInput.value = saved;
+      rememberKey.checked = true;
+    }
+  } catch {
+    setStatus("This browser does not allow remembered keys. You can still enter one for this session.");
+  }
+}
+
+function persistApiKey() {
+  const key = apiKeyInput.value.trim();
+  if (!key) {
+    removePersistedApiKey();
+    return;
+  }
+  try {
+    localStorage.setItem(API_KEY_STORAGE, key);
+  } catch {
+    rememberKey.checked = false;
+    setStatus("This browser could not store the API key. It remains available for this session only.");
+  }
+}
+
+function removePersistedApiKey() {
+  try {
+    localStorage.removeItem(API_KEY_STORAGE);
+  } catch {
+    // Storage can be unavailable in private or restricted browser modes.
+  }
 }
 
 function setWork(label, percent) {
@@ -250,11 +347,58 @@ function setWork(label, percent) {
   }
 }
 
-function setViewerZoom(value) {
-  viewerZoom = Math.max(1, Math.min(3, Math.round(value * 4) / 4));
-  compareStage.style.transform = `scale(${viewerZoom})`;
-  zoomValue.textContent = `${Math.round(viewerZoom * 100)}%`;
+function setViewerZoom(value, anchorX = null, anchorY = null) {
+  const previousZoom = viewerZoom;
+  const nextZoom = Math.max(1, Math.min(3, Math.round(value * 4) / 4));
+  if (anchorX != null && anchorY != null && nextZoom !== previousZoom) {
+    const rect = compare.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const worldX = (anchorX - centerX - viewerPanX) / previousZoom;
+    const worldY = (anchorY - centerY - viewerPanY) / previousZoom;
+    viewerPanX = anchorX - centerX - worldX * nextZoom;
+    viewerPanY = anchorY - centerY - worldY * nextZoom;
+  }
+  viewerZoom = nextZoom;
+  clampViewerPan();
+  applyViewerTransform();
   updateButtons();
+}
+
+function applyViewerTransform() {
+  compareStage.style.transform =
+    `translate3d(${viewerPanX}px, ${viewerPanY}px, 0) scale(${viewerZoom})`;
+  zoomValue.textContent = `${Math.round(viewerZoom * 100)}%`;
+}
+
+function clampViewerPan() {
+  const viewportWidth = compare.clientWidth;
+  const viewportHeight = compare.clientHeight;
+  const stageWidth = compareStage.offsetWidth;
+  const stageHeight = compareStage.offsetHeight;
+  const maxX = Math.max(0, (stageWidth * viewerZoom - viewportWidth) / 2);
+  const maxY = Math.max(0, (stageHeight * viewerZoom - viewportHeight) / 2);
+  viewerPanX = Math.max(-maxX, Math.min(maxX, viewerPanX));
+  viewerPanY = Math.max(-maxY, Math.min(maxY, viewerPanY));
+}
+
+function resetViewer() {
+  viewerZoom = 1;
+  viewerPanX = 0;
+  viewerPanY = 0;
+  applyViewerTransform();
+  updateButtons();
+}
+
+function endViewerPan(event) {
+  if (!panPointer || event.pointerId !== panPointer.id) {
+    return;
+  }
+  panPointer = null;
+  compare.classList.remove("is-panning");
+  if (compare.hasPointerCapture(event.pointerId)) {
+    compare.releasePointerCapture(event.pointerId);
+  }
 }
 
 function hideWork() {
@@ -363,6 +507,7 @@ async function denoisePhoto() {
   drawRaster(photoCanvas, state.photo);
   drawRaster(beforeCanvas, state.beforePreview);
   drawRaster(afterCanvas, state.result);
+  resetViewer();
   setWork(`Denoise finished using ${message.backend}.`, 100);
   setStatus(
     `Denoise finished using ${message.backend}. The cleaned photo stays on this device.`,
@@ -390,6 +535,7 @@ async function applyStrength() {
   };
   drawRaster(afterCanvas, state.result);
   drawRaster(beforeCanvas, state.beforePreview);
+  resetViewer();
   wipeInput.disabled = false;
   beforeCanvas.style.clipPath = `inset(0 ${100 - Number(wipeInput.value)}% 0 0)`;
   setWork("Match finished", 100);

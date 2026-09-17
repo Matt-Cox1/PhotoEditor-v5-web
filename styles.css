@@ -168,6 +168,41 @@ input[type="file"] {
   color: #cbd2da;
   font-size: 0.8rem;
 }
+.key-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+.check-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.check-label input {
+  accent-color: var(--accent);
+}
+.clear-key {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0;
+  text-decoration: underline;
+}
+.clear-key:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.key-warning {
+  color: var(--quiet);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
 input:not([type="file"]),
 textarea {
   width: 100%;
@@ -345,6 +380,10 @@ canvas {
   overflow: hidden;
   border-radius: 0.55rem;
   background: #080a0c;
+  cursor: default;
+}
+.compare-frame.is-panning {
+  cursor: grabbing;
 }
 .compare-stage {
   position: relative;
@@ -353,6 +392,7 @@ canvas {
   transform: scale(1);
   transform-origin: center center;
   transition: transform 140ms ease;
+  will-change: transform;
 }
 .viewer-label {
   position: absolute;
