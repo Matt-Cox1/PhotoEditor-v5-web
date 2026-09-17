@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PhotoEditor V5 match</title>
-  <link rel="stylesheet" href="./styles.css?v=denoise-16">
+  <link rel="stylesheet" href="./styles.css?v=denoise-17">
 </head>
 <body>
   <main class="app-shell">
@@ -71,13 +71,26 @@
           Generate a target when an API key is available, then apply the color
           and light match without changing image detail.
         </p>
+        <label class="field auto-key-field">
+          <span>OpenAI API key <span class="optional">used by Auto Edit</span></span>
+          <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…">
+          <span class="key-options">
+            <label class="check-label">
+              <input id="rememberKey" type="checkbox">
+              Remember on this device
+            </label>
+            <button id="checkConnection" class="clear-key" type="button" disabled>Test connection</button>
+            <button id="clearKey" class="clear-key" type="button" disabled>Clear saved key</button>
+          </span>
+          <span class="key-warning">Stored in this browser only. Page scripts and browser extensions can read it.</span>
+        </label>
       </div>
       <button id="autoEdit" class="button button-primary auto-button" type="button" disabled>
         Auto Edit
       </button>
       <p class="auto-note">
-        With an API key, Auto Edit sends a resized preview to OpenAI. Without
-        one, load a reference image in Advanced controls first.
+        Auto Edit sends a resized preview to OpenAI when a key is entered.
+        For local-only matching, load a reference image in Advanced controls.
       </p>
     </section>
 
@@ -116,19 +129,6 @@
         </div>
       </div>
       <div class="field-grid">
-        <div class="field">
-          <label for="apiKey">OpenAI API key <span class="optional">needed for Generate</span></label>
-          <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…">
-          <span class="key-options">
-            <label class="check-label">
-              <input id="rememberKey" type="checkbox">
-              Remember on this device
-            </label>
-            <button id="checkConnection" class="clear-key" type="button" disabled>Test connection</button>
-            <button id="clearKey" class="clear-key" type="button" disabled>Clear saved key</button>
-          </span>
-          <span class="key-warning">Stored in this browser only. Page scripts and browser extensions can read it.</span>
-        </div>
         <label class="field">
           <span>Desired look <span class="optional">optional</span></span>
           <textarea id="intent" rows="2" placeholder="Warm late light, keep the original framing."></textarea>
@@ -222,6 +222,6 @@
     </section>
     <p id="status" class="status" role="status">Load a photo to start.</p>
   </main>
-  <script type="module" src="./app.js?v=denoise-16"></script>
+  <script type="module" src="./app.js?v=denoise-17"></script>
 </body>
 </html>

@@ -57,7 +57,7 @@ const cancelWork = document.getElementById("cancelWork");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-16", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-17", import.meta.url),
   { type: "module" },
 );
 
@@ -586,6 +586,11 @@ async function autoEdit() {
     throw new Error("Load a photo first.");
   }
   const hasKey = Boolean(apiKeyInput.value.trim());
+  if (!hasKey && !state.reference) {
+    apiKeyInput.focus();
+    setStatus("Enter an OpenAI API key above, or add a reference image in Advanced controls before using Auto Edit.");
+    return;
+  }
   if (hasKey && !state.reference) {
     const approved = window.confirm(
       "Auto Edit will send a resized photo preview to OpenAI. Your API account may be charged. Continue?",

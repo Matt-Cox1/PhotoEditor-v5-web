@@ -152,6 +152,10 @@ h2 {
   font-size: 0.83rem;
   line-height: 1.45;
 }
+.auto-key-field {
+  max-width: 42rem;
+  margin-top: 0.8rem;
+}
 .auto-button {
   min-width: 9rem;
   min-height: 3.2rem;
