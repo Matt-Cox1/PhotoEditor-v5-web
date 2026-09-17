@@ -380,6 +380,7 @@ canvas {
   overflow: hidden;
   border-radius: 0.55rem;
   background: #080a0c;
+  touch-action: none;
   cursor: default;
 }
 .compare-frame.is-panning {

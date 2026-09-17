@@ -44,7 +44,7 @@ const workBar = document.getElementById("workBar");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-9", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-10", import.meta.url),
   { type: "module" },
 );
 
@@ -66,6 +66,8 @@ let viewerZoom = 1;
 let viewerPanX = 0;
 let viewerPanY = 0;
 let panPointer = null;
+const viewerPointers = new Map();
+let pinchState = null;
 
 worker.onmessage = (event) => {
   const message = event.data;
@@ -234,7 +236,22 @@ compare.addEventListener("wheel", (event) => {
   setViewerZoom(viewerZoom + direction, event.clientX - rect.left, event.clientY - rect.top);
 }, { passive: false });
 compare.addEventListener("pointerdown", (event) => {
-  if (viewerZoom <= 1 || event.target.closest("input, button")) {
+  if (event.target.closest("input, button")) {
+    return;
+  }
+  viewerPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  compare.setPointerCapture(event.pointerId);
+  if (viewerPointers.size === 2) {
+    const [first, second] = viewerPointers.values();
+    pinchState = {
+      distance: pointerDistance(first, second),
+      zoom: viewerZoom,
+    };
+    panPointer = null;
+    compare.classList.add("is-panning");
+    return;
+  }
+  if (viewerZoom <= 1) {
     return;
   }
   panPointer = {
@@ -244,10 +261,19 @@ compare.addEventListener("pointerdown", (event) => {
     panX: viewerPanX,
     panY: viewerPanY,
   };
-  compare.setPointerCapture(event.pointerId);
   compare.classList.add("is-panning");
 });
 compare.addEventListener("pointermove", (event) => {
+  if (viewerPointers.has(event.pointerId)) {
+    viewerPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  }
+  if (pinchState && viewerPointers.size >= 2) {
+    const [first, second] = viewerPointers.values();
+    setViewerZoom(
+      pinchState.zoom * pointerDistance(first, second) / pinchState.distance,
+    );
+    return;
+  }
   if (!panPointer || event.pointerId !== panPointer.id) {
     return;
   }
@@ -391,7 +417,14 @@ function resetViewer() {
 }
 
 function endViewerPan(event) {
+  viewerPointers.delete(event.pointerId);
+  if (viewerPointers.size < 2) {
+    pinchState = null;
+  }
   if (!panPointer || event.pointerId !== panPointer.id) {
+    if (viewerPointers.size === 0) {
+      compare.classList.remove("is-panning");
+    }
     return;
   }
   panPointer = null;
@@ -399,6 +432,13 @@ function endViewerPan(event) {
   if (compare.hasPointerCapture(event.pointerId)) {
     compare.releasePointerCapture(event.pointerId);
   }
+}
+
+function pointerDistance(first, second) {
+  return Math.max(
+    1,
+    Math.hypot(second.x - first.x, second.y - first.y),
+  );
 }
 
 function hideWork() {
