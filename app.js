@@ -20,6 +20,7 @@ const intentInput = document.getElementById("intent");
 const photoMeta = document.getElementById("photoMeta");
 const referenceMeta = document.getElementById("referenceMeta");
 const referenceDrop = document.getElementById("referenceDrop");
+const denoiseMode = document.getElementById("denoiseMode");
 const generateButton = document.getElementById("generate");
 const matchButton = document.getElementById("match");
 const denoiseButton = document.getElementById("denoise");
@@ -32,6 +33,7 @@ const photoCanvas = document.getElementById("photoCanvas");
 const referenceCanvas = document.getElementById("referenceCanvas");
 const beforeCanvas = document.getElementById("beforeCanvas");
 const afterCanvas = document.getElementById("afterCanvas");
+const wipeDivider = document.getElementById("wipeDivider");
 const compare = document.getElementById("compare");
 const compareStage = document.getElementById("compareStage");
 const zoomOut = document.getElementById("zoomOut");
@@ -44,7 +46,7 @@ const workBar = document.getElementById("workBar");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-10", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-11", import.meta.url),
   { type: "module" },
 );
 
@@ -221,7 +223,7 @@ strengthInput.addEventListener("input", () => {
   }, 150);
 });
 wipeInput.addEventListener("input", () => {
-  beforeCanvas.style.clipPath = `inset(0 ${100 - Number(wipeInput.value)}% 0 0)`;
+  updateWipe();
 });
 zoomOut.addEventListener("click", () => setViewerZoom(viewerZoom - 0.25));
 zoomIn.addEventListener("click", () => setViewerZoom(viewerZoom + 0.25));
@@ -397,6 +399,12 @@ function applyViewerTransform() {
   zoomValue.textContent = `${Math.round(viewerZoom * 100)}%`;
 }
 
+function updateWipe() {
+  const percent = Number(wipeInput.value);
+  beforeCanvas.style.clipPath = `inset(0 ${100 - percent}% 0 0)`;
+  wipeDivider.style.left = `${percent}%`;
+}
+
 function clampViewerPan() {
   const viewportWidth = compare.clientWidth;
   const viewportHeight = compare.clientHeight;
@@ -525,21 +533,35 @@ async function denoisePhoto() {
   if (!state.photo) {
     throw new Error("Load a photo first.");
   }
-  setWork(`Preparing a ${DENOISE_MAX}px denoise copy… tiles use 64px windows`, 5);
-  const preview = resizeRaster(state.photo, DENOISE_MAX);
+  const fullResolution = denoiseMode.value === "full";
+  const working = fullResolution ? state.photo : resizeRaster(state.photo, DENOISE_MAX);
+  setWork(
+    fullResolution
+      ? "Running full-resolution SCUNet tiles…"
+      : `Preparing a ${DENOISE_MAX}px denoise copy…`,
+    5,
+  );
   const message = await callDenoise({
     type: "denoise",
-    width: preview.width,
-    height: preview.height,
-    values: preview.values,
+    width: working.width,
+    height: working.height,
+    values: fullResolution ? working.values.slice() : working.values,
     strength: 1,
-  });
-  setWork("Upsampling the denoise correction to the original size…", 92);
-  state.photo = applyDenoiseResidual(state.photo, preview, {
-    width: message.width,
-    height: message.height,
-    values: message.values,
-  });
+  }, fullResolution);
+  if (fullResolution) {
+    state.photo = {
+      width: message.width,
+      height: message.height,
+      values: message.values,
+    };
+  } else {
+    setWork("Upsampling the denoise correction to the original size…", 92);
+    state.photo = applyDenoiseResidual(state.photo, working, {
+      width: message.width,
+      height: message.height,
+      values: message.values,
+    });
+  }
   state.denoised = true;
   state.result = state.photo;
   photoMeta.textContent = `${formatDimensions(state.photo)} · denoised locally`;
@@ -548,7 +570,10 @@ async function denoisePhoto() {
   drawRaster(beforeCanvas, state.beforePreview);
   drawRaster(afterCanvas, state.result);
   resetViewer();
-  setWork(`Denoise finished using ${message.backend}.`, 100);
+  setWork(
+    `Denoise finished using ${message.backend} · ${fullResolution ? "full resolution" : "fast preview"}.`,
+    100,
+  );
   setStatus(
     `Denoise finished using ${message.backend}. The cleaned photo stays on this device.`,
   );
@@ -605,10 +630,14 @@ function callWorker(message) {
   });
 }
 
-function callDenoise(message) {
+function callDenoise(message, transferSource = false) {
   return new Promise((resolve, reject) => {
     denoisePending = { resolve, reject };
-    denoiseWorker.postMessage(message);
+    if (transferSource) {
+      denoiseWorker.postMessage(message, [message.values.buffer]);
+    } else {
+      denoiseWorker.postMessage(message);
+    }
   });
 }
 
