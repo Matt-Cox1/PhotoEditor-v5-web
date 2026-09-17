@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PhotoEditor V5 match</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main>
+    <h1>Hierarchical V5 match</h1>
+    <p class="lede">
+      The photo stays in this tab. Generate sends a resized preview to OpenAI with your key.
+      Match runs on your device. If the browser blocks OpenAI (CORS), drop a reference instead.
+    </p>
+
+    <label class="file">
+      Photo
+      <input id="photo" type="file" accept="image/*">
+    </label>
+    <div class="previews">
+      <figure>
+        <figcaption>Photo</figcaption>
+        <canvas id="photoCanvas"></canvas>
+      </figure>
+      <figure>
+        <figcaption>Reference</figcaption>
+        <canvas id="referenceCanvas"></canvas>
+      </figure>
+    </div>
+
+    <label>
+      OpenAI API key
+      <input id="apiKey" type="password" autocomplete="off" spellcheck="false">
+    </label>
+    <label>
+      Desired look (optional)
+      <textarea id="intent" rows="3" placeholder="Warm late light, keep the original framing."></textarea>
+    </label>
+    <div class="row">
+      <button id="generate" type="button" disabled>Generate AI target reference</button>
+      <label class="file">
+        Drop or choose a reference
+        <input id="reference" type="file" accept="image/*">
+      </label>
+    </div>
+
+    <div class="row">
+      <button id="match" type="button" disabled>Match color and light</button>
+      <label class="strength">
+        Strength
+        <input id="strength" type="range" min="0" max="1" step="0.01" value="1" disabled>
+      </label>
+      <button id="save" type="button" disabled>Save PNG</button>
+    </div>
+
+    <figure class="compare">
+      <figcaption>Result (drag to compare)</figcaption>
+      <div id="compare" class="compare-frame">
+        <canvas id="afterCanvas"></canvas>
+        <canvas id="beforeCanvas"></canvas>
+        <input id="wipe" type="range" min="0" max="100" value="50" disabled>
+      </div>
+    </figure>
+    <p id="status" role="status">Load a photo to start. Serve this folder over HTTP after <code>scripts/build_web.sh</code>.</p>
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
