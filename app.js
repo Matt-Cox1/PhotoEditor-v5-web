@@ -23,6 +23,9 @@ const referenceCanvas = document.getElementById("referenceCanvas");
 const beforeCanvas = document.getElementById("beforeCanvas");
 const afterCanvas = document.getElementById("afterCanvas");
 const compare = document.getElementById("compare");
+const workEl = document.getElementById("work");
+const workLabel = document.getElementById("workLabel");
+const workBar = document.getElementById("workBar");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 
@@ -46,7 +49,8 @@ worker.onmessage = (event) => {
     return;
   }
   if (message.type === "progress") {
-    setStatus(`Fitting V5… step ${message.step} of 5`);
+    const step = Number(message.step) || 0;
+    setWork(`Fitting V5… step ${step} of 5`, 20 + step * 12);
     return;
   }
   if (pending) {
@@ -76,14 +80,17 @@ photoInput.addEventListener("change", async () => {
   if (!file) {
     return;
   }
-  state.photo = await loadRaster(file);
-  state.recipe = null;
-  state.result = null;
-  drawRaster(photoCanvas, state.photo);
-  drawRaster(beforeCanvas, state.photo);
-  clearCanvas(afterCanvas);
-  updateButtons();
-  setStatus("Photo loaded. Generate a reference or drop one, then match.");
+  await run(async () => {
+    setWork("Loading photo…", 20);
+    state.photo = await loadRaster(file);
+    state.recipe = null;
+    state.result = null;
+    drawRaster(photoCanvas, state.photo);
+    drawRaster(beforeCanvas, state.photo);
+    clearCanvas(afterCanvas);
+    setWork("Photo loaded", 100);
+    setStatus("Photo loaded. Generate a reference or drop one, then match.");
+  });
 });
 
 referenceInput.addEventListener("change", async () => {
@@ -91,7 +98,10 @@ referenceInput.addEventListener("change", async () => {
   if (!file) {
     return;
   }
-  await setReference(await loadRaster(file), "Loaded reference from disk.");
+  await run(async () => {
+    setWork("Loading reference…", 40);
+    await setReference(await loadRaster(file), "Loaded reference from disk.");
+  });
 });
 
 compare.addEventListener("dragover", (event) => event.preventDefault());
@@ -102,7 +112,10 @@ document.body.addEventListener("drop", async (event) => {
   if (!file || !file.type.startsWith("image/")) {
     return;
   }
-  await setReference(await loadRaster(file), "Loaded dropped reference.");
+  await run(async () => {
+    setWork("Loading dropped reference…", 40);
+    await setReference(await loadRaster(file), "Loaded dropped reference.");
+  });
 });
 
 generateButton.addEventListener("click", () => run(generateReference));
@@ -136,17 +149,36 @@ function setStatus(text) {
   statusEl.textContent = text;
 }
 
+function setWork(label, percent) {
+  workEl.hidden = false;
+  workLabel.textContent = label;
+  setStatus(label);
+  if (percent == null || Number.isNaN(percent)) {
+    workBar.removeAttribute("value");
+  } else {
+    workBar.max = 100;
+    workBar.value = Math.max(0, Math.min(100, percent));
+  }
+}
+
+function hideWork() {
+  workEl.hidden = true;
+  workBar.removeAttribute("value");
+}
+
 async function run(task) {
   if (state.busy) {
     return;
   }
   state.busy = true;
   updateButtons();
+  setWork("Working…");
   try {
     await task();
   } catch (error) {
     setStatus(error instanceof Error ? error.message : String(error));
   } finally {
+    hideWork();
     state.busy = false;
     updateButtons();
   }
@@ -173,12 +205,14 @@ async function generateReference() {
   if (!key) {
     throw new Error("Enter your OpenAI API key. It stays in this tab.");
   }
-  setStatus("Writing the reference prompt…");
+  setWork("Preparing a preview for OpenAI…", 10);
   const preview = resizeRaster(state.photo, GENERATE_MAX);
   const png = await rasterToPng(preview);
+  setWork("Writing the reference prompt…");
   const prompt = await writePrompt(png, intentInput.value, key);
-  setStatus("Generating the AI target reference…");
+  setWork("Generating the AI target reference…");
   const imagePng = await editImage(png, prompt, key);
+  setWork("Loading the generated reference…", 90);
   const raster = await pngToRaster(imagePng);
   await setReference(raster, "Generated reference is ready. Match color and light next.");
 }
@@ -188,8 +222,9 @@ async function matchPhoto() {
     throw new Error("Need a photo and a reference.");
   }
   assertAspect(state.photo, state.reference);
+  setWork("Preparing images for V5…", 12);
   const fitted = pairForFit(state.photo, state.reference);
-  setStatus("Fitting V5 on this device…");
+  setWork("Fitting V5 on this device…", 20);
   const recipeMessage = await callWorker({
     type: "fit",
     width: fitted.width,
@@ -206,7 +241,7 @@ async function applyStrength() {
     throw new Error("Match a reference before adjusting strength.");
   }
   const strength = Number(strengthInput.value);
-  setStatus("Applying the V5 recipe…");
+  setWork("Applying the V5 recipe…", 88);
   const imageMessage = await callWorker({
     type: "apply",
     width: state.photo.width,
@@ -224,6 +259,7 @@ async function applyStrength() {
   drawRaster(beforeCanvas, state.photo);
   wipeInput.disabled = false;
   beforeCanvas.style.clipPath = `inset(0 ${100 - Number(wipeInput.value)}% 0 0)`;
+  setWork("Match finished", 100);
   setStatus("Match finished. Save PNG exports the auto-edited photo.");
 }
 
@@ -231,6 +267,7 @@ async function savePng() {
   if (!state.result) {
     throw new Error("Match a photo first.");
   }
+  setWork("Encoding PNG…", 60);
   const blob = await rasterToPng(state.result);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -238,6 +275,7 @@ async function savePng() {
   link.download = "photoeditor-v5.png";
   link.click();
   URL.revokeObjectURL(url);
+  setWork("Saved", 100);
   setStatus("Saved photoeditor-v5.png.");
 }
 
@@ -483,7 +521,7 @@ async function writePrompt(png, intent, key) {
         ? Math.min(60, Math.max(0, retryAfter)) * 1000
         : (2 ** attempt + Math.random() * 0.25) * 1000;
       lastMessage = openaiMessage(response.status);
-      setStatus(`Retrying prompt in ${Math.ceil(waitMs / 1000)}s · attempt ${attempt + 2} of 4…`);
+      setWork(`Retrying prompt in ${Math.ceil(waitMs / 1000)}s · attempt ${attempt + 2} of 4…`);
       await sleep(waitMs);
       continue;
     }

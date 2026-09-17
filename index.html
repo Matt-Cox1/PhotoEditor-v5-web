@@ -54,6 +54,14 @@
       <button id="save" type="button" disabled>Save PNG</button>
     </div>
 
+    <div id="work" class="work" hidden>
+      <div class="work-row">
+        <span class="spinner" aria-hidden="true"></span>
+        <span id="workLabel">Working…</span>
+      </div>
+      <progress id="workBar" max="100"></progress>
+    </div>
+
     <figure class="compare">
       <figcaption>Result (drag to compare)</figcaption>
       <div id="compare" class="compare-frame">
@@ -62,7 +70,7 @@
         <input id="wipe" type="range" min="0" max="100" value="50" disabled>
       </div>
     </figure>
-    <p id="status" role="status">Load a photo to start. Serve this folder over HTTP after <code>scripts/build_web.sh</code>.</p>
+    <p id="status" role="status">Load a photo to start.</p>
   </main>
   <script type="module" src="./app.js"></script>
 </body>
