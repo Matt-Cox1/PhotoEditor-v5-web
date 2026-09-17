@@ -35,6 +35,8 @@ const generateButton = document.getElementById("generate");
 const matchButton = document.getElementById("match");
 const denoiseButton = document.getElementById("denoise");
 const saveButton = document.getElementById("save");
+const saveBottom = document.getElementById("saveBottom");
+const saveName = document.getElementById("saveName");
 const strengthInput = document.getElementById("strength");
 const strengthValue = document.getElementById("strengthValue");
 const wipeInput = document.getElementById("wipe");
@@ -57,7 +59,7 @@ const cancelWork = document.getElementById("cancelWork");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-18", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-19", import.meta.url),
   { type: "module" },
 );
 
@@ -67,6 +69,8 @@ const state = {
   recipe: null,
   result: null,
   beforePreview: null,
+  sourceFileName: "",
+  suggestedFileName: "",
   denoised: false,
   workerReady: false,
   busy: false,
@@ -163,6 +167,8 @@ photoInput.addEventListener("change", async () => {
     setWork("Loading photo…", 20);
     state.photo = await loadRaster(file);
     state.beforePreview = resizeRaster(state.photo, DISPLAY_MAX);
+    state.sourceFileName = file.name;
+    state.suggestedFileName = "";
     state.reference = null;
     state.recipe = null;
     state.result = null;
@@ -231,6 +237,7 @@ autoEditButton.addEventListener("click", () => run(autoEdit));
 matchButton.addEventListener("click", () => run(matchPhoto));
 denoiseButton.addEventListener("click", () => run(denoisePhoto));
 saveButton.addEventListener("click", () => run(savePng));
+saveBottom.addEventListener("click", () => run(savePng));
 strengthInput.addEventListener("input", () => {
   strengthValue.textContent = `${Math.round(Number(strengthInput.value) * 100)}%`;
   if (!state.recipe || !state.photo) {
@@ -333,6 +340,10 @@ function updateButtons() {
   denoiseButton.disabled = state.busy || !hasPhoto || state.denoised;
   strengthInput.disabled = state.busy || !state.recipe;
   saveButton.disabled = state.busy || !hasResult;
+  saveBottom.disabled = state.busy || !hasResult;
+  saveName.textContent = hasResult
+    ? `Downloads as ${exportFileName()}`
+    : "No edited photo yet";
   compare.dataset.hasResult = hasResult ? "true" : "false";
   wipeInput.disabled = !hasResult;
   clearKey.disabled = !rememberKey.checked || !apiKeyInput.value.trim();
@@ -556,9 +567,10 @@ async function generateReference() {
   const preview = resizeRaster(state.photo, GENERATE_MAX);
   const png = await rasterToPng(preview);
   setWork("Writing the reference prompt… (up to 90 seconds)");
-  const prompt = await writePrompt(png, intentInput.value, key);
+  const referencePrompt = await writePrompt(png, intentInput.value, key);
+  state.suggestedFileName = referencePrompt.suggestedFileName;
   setWork("Generating the AI target reference…");
-  const imagePng = await editImage(png, prompt, key);
+  const imagePng = await editImage(png, referencePrompt.prompt, key);
   setWork("Loading the generated reference…", 90);
   const raster = await pngToRaster(imagePng);
   await setReference(raster, "Generated reference is ready. Match color and light next.");
@@ -719,11 +731,21 @@ async function savePng() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "photoeditor-v5.png";
+  link.download = exportFileName();
   link.click();
   URL.revokeObjectURL(url);
   setWork("Saved", 100);
-  setStatus("Saved photoeditor-v5.png.");
+  setStatus(`Saved ${exportFileName()}.`);
+}
+
+function exportFileName() {
+  const base = state.suggestedFileName || state.sourceFileName;
+  const sanitized = base
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase();
+  return `${sanitized || "photo"}-edited.png`;
 }
 
 function callWorker(message) {
@@ -1117,9 +1139,21 @@ async function writePrompt(png, intent, key) {
     }
     const requested = intent.trim();
     const intentSection = requested ? `\n\nUser desired look (verbatim):\n${requested}` : "";
-    return `${PRESERVATION}${intentSection}\n\nPhotographic treatment:\n${photographic}`;
+    return {
+      prompt: `${PRESERVATION}${intentSection}\n\nPhotographic treatment:\n${photographic}`,
+      suggestedFileName: sanitizeFileName(payload.file_name),
+    };
   }
   throw new Error(`${lastMessage} Tried 4 times; please retry later.`);
+}
+
+function sanitizeFileName(value) {
+  const sanitized = String(value || "")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase();
+  return sanitized.slice(0, 64);
 }
 
 async function editImage(png, prompt, key) {
