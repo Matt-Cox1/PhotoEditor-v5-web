@@ -46,7 +46,7 @@ const workBar = document.getElementById("workBar");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-11", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-12", import.meta.url),
   { type: "module" },
 );
 
@@ -154,6 +154,7 @@ photoInput.addEventListener("change", async () => {
     state.result = null;
     state.denoised = false;
     photoMeta.textContent = `${formatDimensions(state.photo)} · ready`;
+    setCompareAspect(state.beforePreview);
     drawRaster(photoCanvas, state.photo);
     drawRaster(beforeCanvas, state.beforePreview);
     clearCanvas(afterCanvas);
@@ -288,16 +289,19 @@ compare.addEventListener("pointercancel", endViewerPan);
 
 function updateButtons() {
   const hasPhoto = Boolean(state.photo);
+  const hasResult = Boolean(state.result);
   generateButton.disabled = state.busy || !hasPhoto || !apiKeyInput.value.trim();
   matchButton.disabled = state.busy || !hasPhoto || !state.reference || !state.workerReady;
   denoiseButton.disabled = state.busy || !hasPhoto || state.denoised;
   strengthInput.disabled = state.busy || !state.recipe;
-  saveButton.disabled = state.busy || !state.result;
-  wipeInput.disabled = !state.result;
+  saveButton.disabled = state.busy || !hasResult;
+  compare.dataset.hasResult = hasResult ? "true" : "false";
+  wipeInput.disabled = !hasResult;
   clearKey.disabled = !rememberKey.checked || !apiKeyInput.value.trim();
-  zoomOut.disabled = !state.result || viewerZoom <= 1;
-  zoomIn.disabled = !state.result || viewerZoom >= 3;
-  zoomReset.disabled = !state.result || viewerZoom === 1;
+  zoomOut.disabled = !hasResult || viewerZoom <= 1;
+  zoomIn.disabled = !hasResult || viewerZoom >= 3;
+  zoomReset.disabled = !hasResult || viewerZoom === 1;
+  updateWipe();
 }
 
 apiKeyInput.addEventListener("input", () => {
@@ -400,7 +404,7 @@ function applyViewerTransform() {
 }
 
 function updateWipe() {
-  const percent = Number(wipeInput.value);
+  const percent = state.result ? Number(wipeInput.value) : 100;
   beforeCanvas.style.clipPath = `inset(0 ${100 - percent}% 0 0)`;
   wipeDivider.style.left = `${percent}%`;
 }
@@ -488,6 +492,14 @@ async function setReference(raster, message) {
   }
   updateButtons();
   setStatus(message);
+}
+
+function setCompareAspect(raster) {
+  if (!raster) {
+    compare.style.removeProperty("aspect-ratio");
+    return;
+  }
+  compare.style.aspectRatio = `${raster.width} / ${raster.height}`;
 }
 
 async function generateReference() {
@@ -601,8 +613,7 @@ async function applyStrength() {
   drawRaster(afterCanvas, state.result);
   drawRaster(beforeCanvas, state.beforePreview);
   resetViewer();
-  wipeInput.disabled = false;
-  beforeCanvas.style.clipPath = `inset(0 ${100 - Number(wipeInput.value)}% 0 0)`;
+  updateWipe();
   setWork("Match finished", 100);
   setStatus("Match finished. Save PNG exports the auto-edited photo.");
 }

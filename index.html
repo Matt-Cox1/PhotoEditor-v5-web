@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PhotoEditor V5 match</title>
-  <link rel="stylesheet" href="./styles.css?v=denoise-11">
+  <link rel="stylesheet" href="./styles.css?v=denoise-12">
 </head>
 <body>
   <main class="app-shell">
@@ -43,7 +43,7 @@
         <span class="step-number">2</span>
         <div>
           <h2>Clean it up locally <span class="optional">Optional</span></h2>
-          <p>SCUNet removes real-world noise with WebGPU or a WASM fallback.</p>
+          <p>SCUNet runs on your GPU when available. Otherwise it uses your CPU and will be slower.</p>
         </div>
       </div>
       <div class="action-line">
@@ -53,7 +53,7 @@
         <label class="denoise-mode">
           <span>Quality</span>
           <select id="denoiseMode">
-            <option value="full">Full resolution · app-like</option>
+            <option value="full">Full resolution · highest quality</option>
             <option value="fast">Fast 1536px preview</option>
           </select>
         </label>
@@ -70,8 +70,8 @@
         </div>
       </div>
       <div class="field-grid">
-        <label class="field">
-          <span>OpenAI API key <span class="optional">needed for Generate</span></span>
+        <div class="field">
+          <label for="apiKey">OpenAI API key <span class="optional">needed for Generate</span></label>
           <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…">
           <span class="key-options">
             <label class="check-label">
@@ -81,7 +81,7 @@
             <button id="clearKey" class="clear-key" type="button" disabled>Clear saved key</button>
           </span>
           <span class="key-warning">Stored in this browser only. Page scripts and browser extensions can read it.</span>
-        </label>
+        </div>
         <label class="field">
           <span>Desired look <span class="optional">optional</span></span>
           <textarea id="intent" rows="2" placeholder="Warm late light, keep the original framing."></textarea>
@@ -141,14 +141,14 @@
       <div class="viewer-layout">
         <figure class="compare viewer-main">
           <figcaption>Before / after</figcaption>
-          <div id="compare" class="compare-frame">
+          <div id="compare" class="compare-frame" data-has-result="false">
             <div id="compareStage" class="compare-stage">
               <canvas id="afterCanvas"></canvas>
               <canvas id="beforeCanvas"></canvas>
-              <span class="viewer-label viewer-label-after">After</span>
-              <span class="viewer-label viewer-label-before">Before</span>
+              <span id="wipeDivider" class="wipe-divider" aria-hidden="true"></span>
             </div>
-            <span id="wipeDivider" class="wipe-divider" aria-hidden="true"></span>
+            <span class="viewer-label viewer-label-after">After</span>
+            <span class="viewer-label viewer-label-before">Before</span>
             <div class="zoom-controls" aria-label="Comparison zoom">
               <button id="zoomOut" class="zoom-button" type="button" disabled aria-label="Zoom out">−</button>
               <span id="zoomValue">100%</span>
@@ -172,6 +172,6 @@
     </section>
     <p id="status" class="status" role="status">Load a photo to start.</p>
   </main>
-  <script type="module" src="./app.js?v=denoise-11"></script>
+  <script type="module" src="./app.js?v=denoise-12"></script>
 </body>
 </html>

@@ -122,7 +122,7 @@ async function createSession() {
   } catch (webgpuError) {
     self.postMessage({
       type: "status",
-      message: "WebGPU is unavailable. Trying the WASM fallback…",
+      message: "WebGPU is unavailable. Switching to CPU/WASM. This will be slower…",
     });
     try {
       const session = await ort.InferenceSession.create(MODEL_URL, {
