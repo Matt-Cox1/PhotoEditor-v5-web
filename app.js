@@ -55,7 +55,7 @@ const workBar = document.getElementById("workBar");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-13", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-14", import.meta.url),
   { type: "module" },
 );
 
@@ -559,16 +559,13 @@ async function autoEdit() {
       return;
     }
   }
-  if (!state.denoised) {
-    await denoisePhoto();
-  }
   if (!state.reference && hasKey) {
     await generateReference();
   }
   if (state.reference) {
     await matchPhoto();
   } else {
-    setStatus("Local denoise finished. Add an API key or reference to match color and light.");
+    throw new Error("Auto Edit needs an API key or a reference image. Denoise is available separately in Advanced controls.");
   }
 }
 

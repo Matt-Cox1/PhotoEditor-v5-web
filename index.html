@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PhotoEditor V5 match</title>
-  <link rel="stylesheet" href="./styles.css?v=denoise-13">
+  <link rel="stylesheet" href="./styles.css?v=denoise-14">
 </head>
 <body>
   <main class="app-shell">
@@ -68,8 +68,8 @@
         <p class="eyebrow">One-step workflow</p>
         <h2>Auto Edit</h2>
         <p class="auto-description">
-          Denoise the photo, generate a target when an API key is available,
-          and apply the color and light match.
+          Generate a target when an API key is available, then apply the color
+          and light match without changing image detail.
         </p>
       </div>
       <button id="autoEdit" class="button button-primary auto-button" type="button" disabled>
@@ -77,7 +77,7 @@
       </button>
       <p class="auto-note">
         With an API key, Auto Edit sends a resized preview to OpenAI. Without
-        one, it runs the local denoise pass only.
+        one, load a reference image in Advanced controls first.
       </p>
     </section>
 
@@ -220,6 +220,6 @@
     </section>
     <p id="status" class="status" role="status">Load a photo to start.</p>
   </main>
-  <script type="module" src="./app.js?v=denoise-13"></script>
+  <script type="module" src="./app.js?v=denoise-14"></script>
 </body>
 </html>
