@@ -30,13 +30,18 @@ const referenceCanvas = document.getElementById("referenceCanvas");
 const beforeCanvas = document.getElementById("beforeCanvas");
 const afterCanvas = document.getElementById("afterCanvas");
 const compare = document.getElementById("compare");
+const compareStage = document.getElementById("compareStage");
+const zoomOut = document.getElementById("zoomOut");
+const zoomIn = document.getElementById("zoomIn");
+const zoomReset = document.getElementById("zoomReset");
+const zoomValue = document.getElementById("zoomValue");
 const workEl = document.getElementById("work");
 const workLabel = document.getElementById("workLabel");
 const workBar = document.getElementById("workBar");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-7", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-8", import.meta.url),
   { type: "module" },
 );
 
@@ -54,6 +59,7 @@ const state = {
 let pending = null;
 let denoisePending = null;
 let strengthTimer = 0;
+let viewerZoom = 1;
 
 worker.onmessage = (event) => {
   const message = event.data;
@@ -208,6 +214,9 @@ strengthInput.addEventListener("input", () => {
 wipeInput.addEventListener("input", () => {
   beforeCanvas.style.clipPath = `inset(0 ${100 - Number(wipeInput.value)}% 0 0)`;
 });
+zoomOut.addEventListener("click", () => setViewerZoom(viewerZoom - 0.25));
+zoomIn.addEventListener("click", () => setViewerZoom(viewerZoom + 0.25));
+zoomReset.addEventListener("click", () => setViewerZoom(1));
 
 function updateButtons() {
   const hasPhoto = Boolean(state.photo);
@@ -217,6 +226,9 @@ function updateButtons() {
   strengthInput.disabled = state.busy || !state.recipe;
   saveButton.disabled = state.busy || !state.result;
   wipeInput.disabled = !state.result;
+  zoomOut.disabled = !state.result || viewerZoom <= 1;
+  zoomIn.disabled = !state.result || viewerZoom >= 3;
+  zoomReset.disabled = !state.result || viewerZoom === 1;
 }
 
 apiKeyInput.addEventListener("input", updateButtons);
@@ -236,6 +248,13 @@ function setWork(label, percent) {
     workBar.max = 100;
     workBar.value = Math.max(0, Math.min(100, percent));
   }
+}
+
+function setViewerZoom(value) {
+  viewerZoom = Math.max(1, Math.min(3, Math.round(value * 4) / 4));
+  compareStage.style.transform = `scale(${viewerZoom})`;
+  zoomValue.textContent = `${Math.round(viewerZoom * 100)}%`;
+  updateButtons();
 }
 
 function hideWork() {

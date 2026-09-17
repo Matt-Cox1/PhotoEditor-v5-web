@@ -346,6 +346,14 @@ canvas {
   border-radius: 0.55rem;
   background: #080a0c;
 }
+.compare-stage {
+  position: relative;
+  width: max-content;
+  min-width: 100%;
+  transform: scale(1);
+  transform-origin: center center;
+  transition: transform 140ms ease;
+}
 .viewer-label {
   position: absolute;
   top: 0.7rem;
@@ -366,6 +374,49 @@ canvas {
 }
 .viewer-label-before {
   left: 0.7rem;
+}
+.zoom-controls {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  border: 1px solid #ffffff33;
+  border-radius: 0.45rem;
+  background: #0d0f12dd;
+  color: #fff;
+  padding: 0.2rem;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+.zoom-button,
+.zoom-reset {
+  min-width: 1.7rem;
+  min-height: 1.7rem;
+  border: 0;
+  border-radius: 0.28rem;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+}
+.zoom-reset {
+  min-width: auto;
+  padding: 0 0.35rem;
+  font-size: 0.68rem;
+}
+.zoom-button:hover:not(:disabled),
+.zoom-reset:hover:not(:disabled) {
+  background: #ffffff1c;
+}
+.zoom-button:disabled,
+.zoom-reset:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
 }
 .compare-frame canvas {
   border: 0;

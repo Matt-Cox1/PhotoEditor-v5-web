@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PhotoEditor V5 match</title>
-  <link rel="stylesheet" href="./styles.css?v=denoise-7">
+  <link rel="stylesheet" href="./styles.css?v=denoise-8">
 </head>
 <body>
   <main class="app-shell">
@@ -127,10 +127,18 @@
         <figure class="compare viewer-main">
           <figcaption>Before / after</figcaption>
           <div id="compare" class="compare-frame">
-            <canvas id="afterCanvas"></canvas>
-            <canvas id="beforeCanvas"></canvas>
-            <span class="viewer-label viewer-label-after">After</span>
-            <span class="viewer-label viewer-label-before">Before</span>
+            <div id="compareStage" class="compare-stage">
+              <canvas id="afterCanvas"></canvas>
+              <canvas id="beforeCanvas"></canvas>
+              <span class="viewer-label viewer-label-after">After</span>
+              <span class="viewer-label viewer-label-before">Before</span>
+            </div>
+            <div class="zoom-controls" aria-label="Comparison zoom">
+              <button id="zoomOut" class="zoom-button" type="button" disabled aria-label="Zoom out">−</button>
+              <span id="zoomValue">100%</span>
+              <button id="zoomIn" class="zoom-button" type="button" disabled aria-label="Zoom in">+</button>
+              <button id="zoomReset" class="zoom-reset" type="button" disabled>Reset</button>
+            </div>
             <input id="wipe" type="range" min="0" max="100" value="50" disabled aria-label="Before and after split">
           </div>
         </figure>
@@ -148,6 +156,6 @@
     </section>
     <p id="status" class="status" role="status">Load a photo to start.</p>
   </main>
-  <script type="module" src="./app.js?v=denoise-7"></script>
+  <script type="module" src="./app.js?v=denoise-8"></script>
 </body>
 </html>
