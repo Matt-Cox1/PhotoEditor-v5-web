@@ -57,7 +57,7 @@ const cancelWork = document.getElementById("cancelWork");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-17", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-18", import.meta.url),
   { type: "module" },
 );
 
@@ -163,13 +163,17 @@ photoInput.addEventListener("change", async () => {
     setWork("Loading photo…", 20);
     state.photo = await loadRaster(file);
     state.beforePreview = resizeRaster(state.photo, DISPLAY_MAX);
+    state.reference = null;
     state.recipe = null;
     state.result = null;
     state.denoised = false;
+    referenceInput.value = "";
     photoMeta.textContent = `${formatDimensions(state.photo)} · ready`;
+    referenceMeta.textContent = "No reference selected";
     setCompareAspect(state.beforePreview);
     drawRaster(photoCanvas, state.photo);
     drawRaster(beforeCanvas, state.beforePreview);
+    clearCanvas(referenceCanvas);
     clearCanvas(afterCanvas);
     resetViewer();
     setWork("Photo loaded", 100);
