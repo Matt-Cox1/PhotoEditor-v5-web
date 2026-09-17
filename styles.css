@@ -272,6 +272,16 @@ input[type="file"] {
 .meta {
   margin: -0.35rem 0 0;
 }
+.reference-save {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+.reference-save .button {
+  min-height: 2.2rem;
+  font-size: 0.78rem;
+}
 .field-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

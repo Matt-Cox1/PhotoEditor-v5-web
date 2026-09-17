@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PhotoEditor V5 match</title>
-  <link rel="stylesheet" href="./styles.css?v=denoise-19">
+  <link rel="stylesheet" href="./styles.css?v=denoise-20">
 </head>
 <body>
   <main class="app-shell">
@@ -145,6 +145,12 @@
         </label>
       </div>
       <p id="referenceMeta" class="meta">No reference selected</p>
+      <div class="reference-save">
+        <button id="saveReference" class="button button-secondary" type="button" disabled>
+          Save Reference
+        </button>
+        <span id="referenceNotice" class="key-warning">Generated AI references retain OpenAI's invisible watermark.</span>
+      </div>
     </section>
 
     <section class="panel step-panel">
@@ -228,6 +234,6 @@
     </div>
     <p id="status" class="status" role="status">Load a photo to start.</p>
   </main>
-  <script type="module" src="./app.js?v=denoise-19"></script>
+  <script type="module" src="./app.js?v=denoise-20"></script>
 </body>
 </html>

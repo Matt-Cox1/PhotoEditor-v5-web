@@ -29,6 +29,8 @@ const checkConnection = document.getElementById("checkConnection");
 const intentInput = document.getElementById("intent");
 const photoMeta = document.getElementById("photoMeta");
 const referenceMeta = document.getElementById("referenceMeta");
+const saveReference = document.getElementById("saveReference");
+const referenceNotice = document.getElementById("referenceNotice");
 const referenceDrop = document.getElementById("referenceDrop");
 const denoiseMode = document.getElementById("denoiseMode");
 const generateButton = document.getElementById("generate");
@@ -59,7 +61,7 @@ const cancelWork = document.getElementById("cancelWork");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-19", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-20", import.meta.url),
   { type: "module" },
 );
 
@@ -71,6 +73,9 @@ const state = {
   beforePreview: null,
   sourceFileName: "",
   suggestedFileName: "",
+  referenceBytes: null,
+  referenceGenerated: false,
+  referenceFileName: "",
   denoised: false,
   workerReady: false,
   busy: false,
@@ -170,6 +175,9 @@ photoInput.addEventListener("change", async () => {
     state.sourceFileName = file.name;
     state.suggestedFileName = "";
     state.reference = null;
+    state.referenceBytes = null;
+    state.referenceGenerated = false;
+    state.referenceFileName = "";
     state.recipe = null;
     state.result = null;
     state.denoised = false;
@@ -195,6 +203,10 @@ referenceInput.addEventListener("change", async () => {
   await run(async () => {
     setWork("Loading reference…", 40);
     await setReference(await loadRaster(file), "Loaded reference from disk.");
+    state.referenceBytes = new Uint8Array(await file.arrayBuffer());
+    state.referenceGenerated = false;
+    state.referenceFileName = file.name;
+    updateReferenceControls();
   });
 });
 
@@ -229,6 +241,10 @@ document.body.addEventListener("drop", async (event) => {
   await run(async () => {
     setWork("Loading dropped reference…", 40);
     await setReference(await loadRaster(file), "Loaded dropped reference.");
+    state.referenceBytes = new Uint8Array(await file.arrayBuffer());
+    state.referenceGenerated = false;
+    state.referenceFileName = file.name;
+    updateReferenceControls();
   });
 });
 
@@ -238,6 +254,7 @@ matchButton.addEventListener("click", () => run(matchPhoto));
 denoiseButton.addEventListener("click", () => run(denoisePhoto));
 saveButton.addEventListener("click", () => run(savePng));
 saveBottom.addEventListener("click", () => run(savePng));
+saveReference.addEventListener("click", () => run(saveReferenceFile));
 strengthInput.addEventListener("input", () => {
   strengthValue.textContent = `${Math.round(Number(strengthInput.value) * 100)}%`;
   if (!state.recipe || !state.photo) {
@@ -348,6 +365,7 @@ function updateButtons() {
   wipeInput.disabled = !hasResult;
   clearKey.disabled = !rememberKey.checked || !apiKeyInput.value.trim();
   checkConnection.disabled = state.busy || !apiKeyInput.value.trim();
+  updateReferenceControls();
   zoomOut.disabled = !hasResult || viewerZoom <= 1;
   zoomIn.disabled = !hasResult || viewerZoom >= 3;
   zoomReset.disabled = !hasResult || viewerZoom === 1;
@@ -571,9 +589,13 @@ async function generateReference() {
   state.suggestedFileName = referencePrompt.suggestedFileName;
   setWork("Generating the AI target reference…");
   const imagePng = await editImage(png, referencePrompt.prompt, key);
+  state.referenceBytes = imagePng;
+  state.referenceGenerated = true;
+  state.referenceFileName = `${state.suggestedFileName || "photo"}-ai-reference.png`;
   setWork("Loading the generated reference…", 90);
   const raster = await pngToRaster(imagePng);
   await setReference(raster, "Generated reference is ready. Match color and light next.");
+  updateReferenceControls();
 }
 
 async function checkOpenAiConnection() {
@@ -746,6 +768,37 @@ function exportFileName() {
     .replace(/^_+|_+$/g, "")
     .toLowerCase();
   return `${sanitized || "photo"}-edited.png`;
+}
+
+function updateReferenceControls() {
+  const hasReference = Boolean(state.reference);
+  saveReference.disabled = state.busy || !hasReference;
+  saveReference.textContent = state.referenceGenerated
+    ? "Save AI Reference"
+    : "Save Reference";
+  referenceNotice.textContent = state.referenceGenerated
+    ? "This AI-generated reference retains OpenAI's invisible watermark."
+    : "Generated AI references retain OpenAI's invisible watermark.";
+}
+
+async function saveReferenceFile() {
+  if (!state.reference) {
+    throw new Error("Load or generate a reference first.");
+  }
+  const bytes = state.referenceBytes
+    ? new Blob([state.referenceBytes], { type: "image/png" })
+    : await rasterToPng(state.reference);
+  const url = URL.createObjectURL(bytes);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = state.referenceFileName || "reference.png";
+  link.click();
+  URL.revokeObjectURL(url);
+  setStatus(
+    state.referenceGenerated
+      ? "Saved AI reference. OpenAI's invisible watermark is retained."
+      : `Saved ${link.download}.`,
+  );
 }
 
 function callWorker(message) {
