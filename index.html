@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PhotoEditor V5 match</title>
-  <link rel="stylesheet" href="./styles.css?v=denoise-6">
+  <link rel="stylesheet" href="./styles.css?v=denoise-7">
 </head>
 <body>
   <main class="app-shell">
@@ -50,7 +50,7 @@
         <button id="denoise" class="button button-secondary" type="button" disabled>
           Denoise locally
         </button>
-        <span class="action-note">First use downloads about 74 MB.</span>
+        <span class="action-note">Uses a 1536px working copy. First use downloads about 74 MB.</span>
       </div>
     </section>
 
@@ -123,27 +123,31 @@
         </div>
         <span class="compare-hint">Drag the slider to compare</span>
       </div>
-      <div class="previews">
-        <figure>
-          <figcaption>Working photo</figcaption>
-          <canvas id="photoCanvas"></canvas>
+      <div class="viewer-layout">
+        <figure class="compare viewer-main">
+          <figcaption>Before / after</figcaption>
+          <div id="compare" class="compare-frame">
+            <canvas id="afterCanvas"></canvas>
+            <canvas id="beforeCanvas"></canvas>
+            <span class="viewer-label viewer-label-after">After</span>
+            <span class="viewer-label viewer-label-before">Before</span>
+            <input id="wipe" type="range" min="0" max="100" value="50" disabled aria-label="Before and after split">
+          </div>
         </figure>
-        <figure>
-          <figcaption>Target reference</figcaption>
-          <canvas id="referenceCanvas"></canvas>
-        </figure>
-      </div>
-      <figure class="compare">
-        <figcaption>Before / after</figcaption>
-        <div id="compare" class="compare-frame">
-          <canvas id="afterCanvas"></canvas>
-          <canvas id="beforeCanvas"></canvas>
-          <input id="wipe" type="range" min="0" max="100" value="50" disabled aria-label="Before and after split">
+        <div class="viewer-side">
+          <figure>
+            <figcaption>Working photo</figcaption>
+            <canvas id="photoCanvas"></canvas>
+          </figure>
+          <figure>
+            <figcaption>Target reference</figcaption>
+            <canvas id="referenceCanvas"></canvas>
+          </figure>
         </div>
-      </figure>
+      </div>
     </section>
     <p id="status" class="status" role="status">Load a photo to start.</p>
   </main>
-  <script type="module" src="./app.js?v=denoise-6"></script>
+  <script type="module" src="./app.js?v=denoise-7"></script>
 </body>
 </html>

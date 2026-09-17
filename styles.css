@@ -308,9 +308,17 @@ progress:not([value]) {
 .preview-header h2 {
   margin-bottom: 0;
 }
-.previews {
+.viewer-layout {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.65fr) minmax(12rem, 0.75fr);
+  gap: 0.8rem;
+}
+.viewer-main {
+  min-width: 0;
+}
+.viewer-side {
+  display: grid;
+  align-content: start;
   gap: 0.8rem;
 }
 figure {
@@ -337,6 +345,27 @@ canvas {
   overflow: hidden;
   border-radius: 0.55rem;
   background: #080a0c;
+}
+.viewer-label {
+  position: absolute;
+  top: 0.7rem;
+  z-index: 2;
+  border: 1px solid #ffffff33;
+  border-radius: 999px;
+  background: #0d0f12bb;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 0.3rem 0.5rem;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.viewer-label-after {
+  right: 0.7rem;
+}
+.viewer-label-before {
+  left: 0.7rem;
 }
 .compare-frame canvas {
   border: 0;
@@ -385,8 +414,11 @@ canvas {
     padding: 0.9rem;
   }
   .field-grid,
-  .previews {
+  .viewer-layout {
     grid-template-columns: 1fr;
+  }
+  .viewer-side {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .preview-header {
     display: block;

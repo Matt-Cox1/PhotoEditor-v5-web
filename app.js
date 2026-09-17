@@ -5,7 +5,9 @@ const PROMPT_MODEL = "gpt-5.6-luna";
 const IMAGE_MODEL = "gpt-image-2.5-flare";
 const IMAGE_QUALITY = "medium";
 const GENERATE_MAX = 1536;
+const DENOISE_MAX = 1536;
 const FIT_MAX = 720;
+const DISPLAY_MAX = 1600;
 const OPENAI = "https://api.openai.com/v1";
 
 const photoInput = document.getElementById("photo");
@@ -34,7 +36,7 @@ const workBar = document.getElementById("workBar");
 
 const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
 const denoiseWorker = new Worker(
-  new URL("./denoise_worker.js?v=denoise-6", import.meta.url),
+  new URL("./denoise_worker.js?v=denoise-7", import.meta.url),
   { type: "module" },
 );
 
@@ -43,6 +45,7 @@ const state = {
   reference: null,
   recipe: null,
   result: null,
+  beforePreview: null,
   denoised: false,
   workerReady: false,
   busy: false,
@@ -130,12 +133,13 @@ photoInput.addEventListener("change", async () => {
   await run(async () => {
     setWork("Loading photo…", 20);
     state.photo = await loadRaster(file);
+    state.beforePreview = resizeRaster(state.photo, DISPLAY_MAX);
     state.recipe = null;
     state.result = null;
     state.denoised = false;
     photoMeta.textContent = `${formatDimensions(state.photo)} · ready`;
     drawRaster(photoCanvas, state.photo);
-    drawRaster(beforeCanvas, state.photo);
+    drawRaster(beforeCanvas, state.beforePreview);
     clearCanvas(afterCanvas);
     setWork("Photo loaded", 100);
     setStatus("Photo loaded. Generate a reference or drop one, then match.");
@@ -264,10 +268,13 @@ async function setReference(raster, message) {
   }
   state.reference = raster;
   state.recipe = null;
-  state.result = null;
+  state.result = state.denoised ? state.photo : null;
   drawRaster(referenceCanvas, raster);
   referenceMeta.textContent = `${formatDimensions(raster)} · ready`;
   clearCanvas(afterCanvas);
+  if (state.result) {
+    drawRaster(afterCanvas, state.result);
+  }
   updateButtons();
   setStatus(message);
 }
@@ -315,8 +322,8 @@ async function denoisePhoto() {
   if (!state.photo) {
     throw new Error("Load a photo first.");
   }
-  setWork("Preparing a 1024px denoise copy… tiles use 64px windows", 5);
-  const preview = resizeRaster(state.photo, 1024);
+  setWork(`Preparing a ${DENOISE_MAX}px denoise copy… tiles use 64px windows`, 5);
+  const preview = resizeRaster(state.photo, DENOISE_MAX);
   const message = await callDenoise({
     type: "denoise",
     width: preview.width,
@@ -331,12 +338,12 @@ async function denoisePhoto() {
     values: message.values,
   });
   state.denoised = true;
+  state.result = state.photo;
   photoMeta.textContent = `${formatDimensions(state.photo)} · denoised locally`;
   state.recipe = null;
-  state.result = null;
   drawRaster(photoCanvas, state.photo);
-  drawRaster(beforeCanvas, state.photo);
-  clearCanvas(afterCanvas);
+  drawRaster(beforeCanvas, state.beforePreview);
+  drawRaster(afterCanvas, state.result);
   setWork(`Denoise finished using ${message.backend}.`, 100);
   setStatus(
     `Denoise finished using ${message.backend}. The cleaned photo stays on this device.`,
@@ -363,7 +370,7 @@ async function applyStrength() {
     values: imageMessage.values,
   };
   drawRaster(afterCanvas, state.result);
-  drawRaster(beforeCanvas, state.photo);
+  drawRaster(beforeCanvas, state.beforePreview);
   wipeInput.disabled = false;
   beforeCanvas.style.clipPath = `inset(0 ${100 - Number(wipeInput.value)}% 0 0)`;
   setWork("Match finished", 100);
@@ -535,13 +542,14 @@ function rasterToImageData(raster) {
 }
 
 function drawRaster(canvas, raster) {
-  canvas.width = raster.width;
-  canvas.height = raster.height;
+  const display = resizeRaster(raster, DISPLAY_MAX);
+  canvas.width = display.width;
+  canvas.height = display.height;
   const context = canvas.getContext("2d", { colorSpace: "srgb" });
   if (!context) {
     throw new Error("This browser cannot draw the image.");
   }
-  context.putImageData(rasterToImageData(raster), 0, 0);
+  context.putImageData(rasterToImageData(display), 0, 0);
 }
 
 function clearCanvas(canvas) {
