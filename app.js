@@ -4,6 +4,8 @@ const PRESERVATION =
 const PROMPT_MODEL = "gpt-5.6-luna";
 const IMAGE_MODEL = "gpt-image-2.5-flare";
 const IMAGE_QUALITY = "medium";
+// Partial frames keep bytes flowing; iOS WebKit drops requests that stay silent for about 60 s.
+const IMAGE_PARTIALS = 2;
 const GENERATE_MAX = 1536;
 const DENOISE_MAX = 1536;
 const FIT_MAX = 720;
@@ -595,11 +597,19 @@ async function generateReference() {
   setWork("Preparing a preview for OpenAI…", 10);
   const preview = resizeRaster(state.photo, GENERATE_MAX);
   const png = await rasterToPng(preview);
-  setWork("Writing the reference prompt… (up to 90 seconds)");
-  const referencePrompt = await writePrompt(png, intentInput.value, key);
-  state.suggestedFileName = referencePrompt.suggestedFileName;
-  setWork("Generating the AI target reference…");
-  const imagePng = await editImage(png, referencePrompt.prompt, key);
+  const wakeLock = await requestScreenWakeLock();
+  const screenHint = wakeLock ? "" : " Keep the screen on until the reference is ready.";
+  let referencePrompt;
+  let imagePng;
+  try {
+    setWork(`Writing the reference prompt… (up to 90 seconds)${screenHint}`);
+    referencePrompt = await writePrompt(png, intentInput.value, key);
+    state.suggestedFileName = referencePrompt.suggestedFileName;
+    setWork(`Generating the AI target reference…${screenHint}`);
+    imagePng = await editImage(png, referencePrompt.prompt, key);
+  } finally {
+    await wakeLock?.release();
+  }
   state.referenceBytes = imagePng;
   state.referenceGenerated = true;
   state.referenceFileName = `${state.suggestedFileName || "photo"}-ai-reference.png`;
@@ -611,23 +621,41 @@ async function generateReference() {
   updateReferenceControls();
 }
 
+/** Returns a screen wake lock, or null when the browser lacks the API or refuses it (for example in Low Power Mode). */
+async function requestScreenWakeLock() {
+  if (!("wakeLock" in navigator)) {
+    return null;
+  }
+  try {
+    return await navigator.wakeLock.request("screen");
+  } catch (error) {
+    if (error?.name === "NotAllowedError") {
+      return null;
+    }
+    throw error;
+  }
+}
+
 async function checkOpenAiConnection() {
   const key = apiKeyInput.value.trim();
   if (!key) {
     throw new Error("Enter an OpenAI API key first.");
   }
   setWork("Checking the OpenAI connection…", 25);
-  const response = await openaiFetch(
+  await openaiRequest(
+    "Connection check",
     `${OPENAI}/models`,
     {
       method: "GET",
       headers: { Authorization: `Bearer ${key}` },
     },
     20_000,
+    (response) => {
+      if (!response.ok) {
+        throw new Error(openaiMessage(response.status));
+      }
+    },
   );
-  if (!response.ok) {
-    throw new Error(openaiMessage(response.status));
-  }
   setWork("OpenAI connection is working.", 100);
   setStatus("OpenAI connection is working. No photo was sent.");
 }
@@ -1053,8 +1081,24 @@ function clamp01(value) {
   return Math.min(1, Math.max(0, value));
 }
 
-function isCorsFailure(error) {
-  return error instanceof TypeError || /failed to fetch|load failed|networkerror/i.test(String(error));
+class NetworkFailure extends Error {
+  constructor(cause) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = "NetworkFailure";
+    this.cause = cause;
+  }
+}
+
+function asNetworkFailure(error) {
+  return error?.name === "AbortError" ? error : new NetworkFailure(error);
+}
+
+function networkFailureMessage(step, elapsedMs, wentHidden, failure) {
+  const seconds = Math.round(elapsedMs / 1000);
+  const reason = wentHidden
+    ? "The tab went to the background, so the device dropped the connection."
+    : "The connection dropped.";
+  return `${step} failed after ${seconds} s (${failure.message}). ${reason} Keep this tab open and the screen on, then retry, or drop in a reference image instead.`;
 }
 
 function openaiMessage(status) {
@@ -1073,35 +1117,104 @@ function openaiMessage(status) {
   return `OpenAI rejected the request (HTTP ${status}).`;
 }
 
-async function openaiFetch(url, options, timeoutMs = 90_000) {
+/**
+ * Runs one OpenAI request. The timeout, cancel button and error reporting cover both the
+ * request and `handleResponse`, so streamed bodies are read under the same guard.
+ */
+async function openaiRequest(step, url, options, timeoutMs, handleResponse) {
   const controller = new AbortController();
   activeRequestController = controller;
   cancelWork.disabled = false;
+  const started = performance.now();
+  let wentHidden = document.visibilityState === "hidden";
+  const onVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      wentHidden = true;
+    }
+  };
+  document.addEventListener("visibilitychange", onVisibilityChange);
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
-  let response;
   try {
-    response = await fetch(url, { ...options, signal: controller.signal });
+    const response = await fetch(url, { ...options, signal: controller.signal }).catch((error) => {
+      throw asNetworkFailure(error);
+    });
+    return await handleResponse(response);
   } catch (error) {
     if (error?.name === "AbortError") {
       throw new Error(
         cancelRequested
           ? "The OpenAI request was cancelled."
-          : "OpenAI did not respond within the time limit. Check the connection and try again.",
+          : `${step} did not finish within ${Math.round(timeoutMs / 1000)} s. Check the connection and try again.`,
       );
     }
-    if (isCorsFailure(error)) {
-      throw new Error(
-        "The browser blocked the OpenAI request (CORS or network). Drop a reference image instead. Match still runs on this device."
-      );
+    if (error instanceof NetworkFailure) {
+      throw new Error(networkFailureMessage(step, performance.now() - started, wentHidden, error));
     }
     throw error;
   } finally {
     window.clearTimeout(timeout);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
     activeRequestController = null;
     cancelWork.disabled = true;
     cancelRequested = false;
   }
-  return response;
+}
+
+/** Yields each JSON event from an OpenAI server-sent event stream. */
+async function* readSseEvents(response) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read().catch((error) => {
+      throw asNetworkFailure(error);
+    });
+    buffer += decoder.decode(value, { stream: !done });
+    buffer = buffer.replace(/\r\n/g, "\n");
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary !== -1) {
+      const event = parseSseBlock(buffer.slice(0, boundary));
+      buffer = buffer.slice(boundary + 2);
+      if (event) {
+        yield event;
+      }
+      boundary = buffer.indexOf("\n\n");
+    }
+    if (done) {
+      const event = parseSseBlock(buffer);
+      if (event) {
+        yield event;
+      }
+      return;
+    }
+  }
+}
+
+function parseSseBlock(block) {
+  const data = block
+    .split("\n")
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).trimStart())
+    .join("\n");
+  if (!data || data === "[DONE]") {
+    return null;
+  }
+  const event = JSON.parse(data);
+  if (event.type === "error") {
+    throw new Error(`OpenAI reported an error: ${event.error?.message || event.message || "unknown"}.`);
+  }
+  return event;
+}
+
+const RESPONSE_TERMINAL_EVENTS = new Set(["response.completed", "response.incomplete", "response.failed"]);
+
+async function finalStreamedResponse(response) {
+  for await (const event of readSseEvents(response)) {
+    if (RESPONSE_TERMINAL_EVENTS.has(event.type)) {
+      return event.response;
+    }
+  }
+  throw new Error("The OpenAI prompt stream ended before the response finished. Retry when ready.");
 }
 
 function retryableStatus(status) {
@@ -1116,6 +1229,7 @@ async function writePrompt(png, intent, key) {
   const body = {
     model: PROMPT_MODEL,
     store: false,
+    stream: true,
     max_output_tokens: 4096,
     text: {
       format: {
@@ -1159,28 +1273,42 @@ async function writePrompt(png, intent, key) {
 
   let lastMessage = "Prompt writing failed.";
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    const response = await openaiFetch(`${OPENAI}/responses`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
+    const outcome = await openaiRequest(
+      "Prompt request",
+      `${OPENAI}/responses`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    });
-    if (retryableStatus(response.status)) {
-      const retryAfter = Number(response.headers.get("Retry-After"));
-      const waitMs = Number.isFinite(retryAfter)
+      90_000,
+      async (response) => {
+        if (retryableStatus(response.status)) {
+          return { retryStatus: response.status, retryAfter: response.headers.get("Retry-After") };
+        }
+        if (!response.ok) {
+          throw new Error(openaiMessage(response.status));
+        }
+        return { json: await finalStreamedResponse(response) };
+      },
+    );
+    if (outcome.retryStatus) {
+      const retryAfter = Number(outcome.retryAfter);
+      const waitMs = outcome.retryAfter != null && Number.isFinite(retryAfter)
         ? Math.min(60, Math.max(0, retryAfter)) * 1000
         : (2 ** attempt + Math.random() * 0.25) * 1000;
-      lastMessage = openaiMessage(response.status);
+      lastMessage = openaiMessage(outcome.retryStatus);
       setWork(`Retrying prompt in ${Math.ceil(waitMs / 1000)}s · attempt ${attempt + 2} of 4…`);
       await sleep(waitMs);
       continue;
     }
-    if (!response.ok) {
-      throw new Error(openaiMessage(response.status));
+    const { json } = outcome;
+    if (json.status === "failed") {
+      throw new Error(`OpenAI failed to write the reference prompt: ${json.error?.message || "no detail given"}.`);
     }
-    const json = await response.json();
     if (json.status === "incomplete" && json.incomplete_details?.reason === "max_output_tokens") {
       body.max_output_tokens = 8192;
       lastMessage = "The prompt reached its output limit.";
@@ -1234,16 +1362,31 @@ async function editImage(png, prompt, key) {
   form.append("quality", IMAGE_QUALITY);
   form.append("output_format", "png");
   form.append("image[]", png, "photo.png");
-  const response = await openaiFetch(`${OPENAI}/images/edits`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}` },
-    body: form,
-  }, 300_000);
-  if (!response.ok) {
-    throw new Error(openaiMessage(response.status));
-  }
-  const json = await response.json();
-  const encoded = json.data?.[0]?.b64_json;
+  form.append("stream", "true");
+  form.append("partial_images", String(IMAGE_PARTIALS));
+  const encoded = await openaiRequest(
+    "Reference image request",
+    `${OPENAI}/images/edits`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}` },
+      body: form,
+    },
+    300_000,
+    async (response) => {
+      if (!response.ok) {
+        throw new Error(openaiMessage(response.status));
+      }
+      for await (const event of readSseEvents(response)) {
+        if (event.type === "image_edit.partial_image") {
+          setWork(`Generating the AI target reference… preview ${event.partial_image_index + 1} of ${IMAGE_PARTIALS}`);
+        } else if (event.type === "image_edit.completed") {
+          return event.b64_json;
+        }
+      }
+      throw new Error("The OpenAI image stream ended before the reference was finished. Retry when ready.");
+    },
+  );
   if (!encoded) {
     throw new Error("OpenAI returned no usable reference image.");
   }
