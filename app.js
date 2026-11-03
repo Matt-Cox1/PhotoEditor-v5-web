@@ -1,5 +1,11 @@
 const PRESERVATION =
-  "Edit this exact photograph as a photographic color-and-light reference. Preserve the camera viewpoint, aspect ratio, framing, geometry, every real subject, object, facial identity, texture and detail. Do not add, remove, move or invent anything. Keep every subject silhouette, limb, facial feature and background landmark at exactly its input position; do not reconstruct anatomy or change poses. Do not add text, borders, new light sources or artificial sky detail. Use only changes achievable with white balance, exposure, curves, color grading and soft local tonal adjustments. Keep believable highlights, shadow depth and natural color; avoid halos, oversaturation and HDR effects.";
+  "Edit this exact photograph as a photographic color-and-light reference. Preserve the camera viewpoint, aspect ratio, framing, geometry, every real subject, object, facial identity, texture and detail. Do not add, remove, move or invent anything. Keep every subject silhouette, limb, facial feature and background landmark at exactly its input position; do not reconstruct anatomy or change poses. Do not add text, borders, new light sources or artificial sky detail. Use only changes achievable with white balance, exposure, curves, color, and local contrast. Keep real texture. A strong grade is welcome. Halos, neon color, and an HDR glow are not.";
+
+const DEFAULT_INTENT =
+  "No look was specified. Finish this exact photograph: correct what is actually wrong in its light and color, give the subject weight, and let the colors that belong in the frame read clearly. Commit to the grade this picture needs. A near-copy of the input is a failed result.";
+
+const PROMPT_WRITER =
+  "You write one image-edit prompt for the supplied photograph. A later step can follow only color, exposure, curves, and mid-frequency contrast on the original pixels. It cannot add texture, objects, weather, or a new crop, so the prompt must not ask for those.\n\nStudy the photograph and the measured facts. Name the subject and the light you see. Name the main thing holding the picture back. Then prescribe the grade in concrete terms: white balance direction, exposure, the shape of the curve, which colors to strengthen, which to quiet, and whether the subject should separate from the ground.\n\nAdapt the grade to this frame. A bird, a night street, snow, and a portrait do not share a recipe. Do not default to warmer, more contrast, and more saturation.\n\nIf the user wrote a desired look, carry it out fully, including bold color and contrast. If they did not, still make a committed finish.\n\nStay inside these constraints: {developer_constraints}\n\nThe prompt is under 220 words. The file name is 2 to 5 lowercase words joined by underscores, describing the scene, with no extension, no dates, and no camera codes.";
 
 const PROMPT_MODEL = "gpt-5.6-luna";
 const IMAGE_MODEL = "gpt-image-2.5-flare";
@@ -109,7 +115,7 @@ worker.onmessage = (event) => {
   }
   if (message.type === "progress") {
     const step = Number(message.step) || 0;
-    setWork(`Fitting V5… step ${step} of 5`, 20 + step * 12);
+    setWork(`Fitting color and light… step ${step} of 5`, 20 + step * 12);
     return;
   }
   if (pending) {
@@ -603,7 +609,7 @@ async function generateReference() {
   let imagePng;
   try {
     setWork(`Writing the reference prompt… (up to 90 seconds)${screenHint}`);
-    referencePrompt = await writePrompt(png, intentInput.value, key);
+    referencePrompt = await writePrompt(png, intentInput.value, key, preview);
     state.suggestedFileName = referencePrompt.suggestedFileName;
     setWork(`Generating the AI target reference…${screenHint}`);
     imagePng = await editImage(png, referencePrompt.prompt, key);
@@ -694,9 +700,9 @@ async function matchPhoto() {
     throw new Error("Need a photo and a reference.");
   }
   assertAspect(state.photo, state.reference);
-  setWork("Preparing images for V5…", 12);
+  setWork("Preparing images…", 12);
   const fitted = pairForFit(state.photo, state.reference);
-  setWork("Fitting V5 on this device…", 20);
+  setWork("Fitting color and light on this device…", 20);
   const recipeMessage = await callWorker({
     type: "fit",
     width: fitted.width,
@@ -763,7 +769,7 @@ async function applyStrength() {
     throw new Error("Match a reference before adjusting strength.");
   }
   const strength = Number(strengthInput.value);
-  setWork("Applying the V5 recipe…", 88);
+  setWork("Applying the match…", 88);
   const imageMessage = await callWorker({
     type: "apply",
     width: state.photo.width,
@@ -1221,10 +1227,78 @@ function retryableStatus(status) {
   return status === 408 || status === 409 || status === 429 || (status >= 500 && status <= 599);
 }
 
-async function writePrompt(png, intent, key) {
-  const intentText = intent.trim()
-    ? intent.trim()
-    : "Make this photograph striking and beautifully finished, with a restrained, natural photographic treatment suited to its actual scene.";
+function sceneFacts(raster) {
+  const values = raster.values;
+  const count = Math.floor(values.length / 3);
+  if (!count) {
+    return "";
+  }
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+  let luma = 0;
+  const samples = [];
+  const step = Math.max(1, Math.floor(count / 4000));
+  let used = 0;
+  for (let pixel = 0; pixel < count; pixel += step) {
+    const index = pixel * 3;
+    const r = values[index];
+    const g = values[index + 1];
+    const b = values[index + 2];
+    red += r;
+    green += g;
+    blue += b;
+    luma += 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    samples.push(0.2126 * r + 0.7152 * g + 0.0722 * b);
+    used += 1;
+  }
+  red /= used;
+  green /= used;
+  blue /= used;
+  luma /= used;
+  samples.sort((a, b) => a - b);
+  const p1 = samples[Math.floor(samples.length * 0.01)] ?? 0;
+  const p99 = samples[Math.min(samples.length - 1, Math.floor(samples.length * 0.99))] ?? 1;
+  const span = Math.max(0, p99 - p1);
+  const spanNote = span < 0.4
+    ? "The tonal range is compressed."
+    : span > 0.82
+      ? "The tonal range is already wide."
+      : "The tonal range is moderate.";
+  let cast = "The frame is close to neutral.";
+  const rules = [
+    "Keep the full framing and the real setting. Do not crop tighter and do not replace the background.",
+  ];
+  if (blue - red > 0.04 && blue + 0.02 >= green) {
+    cast = "The frame reads cool.";
+    rules.push("The frame reads cool. Warm only the colors that are actually cold, and leave colors that should stay blue.");
+  } else if (red - blue > 0.04 && red + 0.02 >= green) {
+    cast = "The frame reads warm.";
+    rules.push("The frame already reads warm. Do not lay a second warm grade over the whole picture.");
+  } else if (green - Math.max(red, blue) > 0.04) {
+    cast = "Green leads the frame.";
+    rules.push("Green leads the frame. Correct a cast only where it is a mistake, not where the subject is green.");
+  }
+  if (span < 0.4) {
+    rules.push("The tonal range is compressed. Opening it is useful if the ends stay believable.");
+  } else if (span > 0.82) {
+    rules.push("The tonal range is already wide. Hold the highlights and the shadows.");
+  }
+  const ratio = raster.height ? raster.width / raster.height : 1;
+  const orientation = ratio > 1.05 ? "landscape" : ratio < 0.95 ? "portrait (tall)" : "square";
+  const summary = [
+    "Measured from this photograph in the browser:",
+    `- Framing: ${orientation}, ${raster.width} × ${raster.height} pixels.`,
+    `- Tone: mean luminance ${luma.toFixed(2)}. The darkest samples sit near ${p1.toFixed(2)} and the brightest near ${p99.toFixed(2)}. The span is ${span.toFixed(2)}. ${spanNote}`,
+    `- Color: mean red ${red.toFixed(2)}, green ${green.toFixed(2)}, blue ${blue.toFixed(2)}. ${cast}`,
+  ].join("\n");
+  return { summary, constraints: rules.join(" ") };
+}
+
+async function writePrompt(png, intent, key, raster) {
+  const intentText = intent.trim() ? intent.trim() : DEFAULT_INTENT;
+  const facts = raster ? sceneFacts(raster) : null;
+  const constraints = facts ? `${PRESERVATION} ${facts.constraints}` : PRESERVATION;
   const imageB64 = await blobToBase64(png);
   const body = {
     model: PROMPT_MODEL,
@@ -1253,13 +1327,14 @@ async function writePrompt(png, intent, key) {
         content: [
           {
             type: "input_text",
-            text: `You are an expert photographic retoucher. Inspect the supplied photo and write a concise, specific image-editing prompt (under 250 words) and a short human-readable file name for the finished photograph. The file name must be 2 to 5 lowercase words joined by underscores, describing the scene (for example misty_geese_at_river), with no extension, no dates and no camera codes. Identify its light, subject and tonal opportunities. Honor the user's requested mood, color, contrast, and photographic style explicitly; do not omit or soften those requests. Use a restrained, natural treatment only when the user gives no desired look. Stay within these constraints: ${PRESERVATION}`,
+            text: PROMPT_WRITER.replace("{developer_constraints}", constraints),
           },
         ],
       },
       {
         role: "user",
         content: [
+          ...(facts ? [{ type: "input_text", text: facts.summary }] : []),
           { type: "input_text", text: intentText },
           {
             type: "input_image",
@@ -1336,8 +1411,9 @@ async function writePrompt(png, intent, key) {
     }
     const requested = intent.trim();
     const intentSection = requested ? `\n\nUser desired look (verbatim):\n${requested}` : "";
+    const genreSection = facts ? `\n\n${facts.constraints}` : "";
     return {
-      prompt: `${PRESERVATION}${intentSection}\n\nPhotographic treatment:\n${photographic}`,
+      prompt: `${PRESERVATION}${genreSection}${intentSection}\n\nPhotographic treatment:\n${photographic}`,
       suggestedFileName: sanitizeFileName(payload.file_name),
     };
   }

@@ -24,7 +24,7 @@ export function apply(width, height, source, recipe, strength) {
 }
 
 /**
- * Fits V5 on equal-sized encoded-sRGB `f32` RGB buffers and returns an opaque recipe.
+ * Fits color and light on equal-sized encoded-sRGB `f32` RGB buffers and returns an opaque recipe.
  *
  * `progress` is called with integers 1 through 5.
  * @param {number} width
