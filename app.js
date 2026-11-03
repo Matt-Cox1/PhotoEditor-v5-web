@@ -9,8 +9,8 @@ const DEFAULT_INTENT =
 const PROMPT_WRITER =
   "You write a color grade for the attached photograph. An image editor applies your words to that photo. It overshoots. 'Lower the exposure a little' and 'quiet the saturation' become a dark, bland picture. Do not ask for those.\n\nWrite a grade that looks better than the input: clearer light, midtones that open, and color that belongs. Name the look in plain words. Do not use stop values, 'subtle,' 'restrained,' or 'nudge.'\n\nDo not describe the scene. Do not mention people, faces, clothing, poses, bark, texture, sharpness, or separating a subject from the background. Those words make the editor repaint the photo. Do not ask for a new crop, weather, or objects. Do not copy the constraints into the grade.\n\nIf the frame is warm, keep that warmth and give the other colors room. Do not cool the whole picture. If the tonal range is already wide, protect the ends and open the middle. Do not darken the frame to create contrast.\n\nIf the user wrote a desired look, follow it, and still keep the picture bright enough to look alive. If they did not, make the finished grade described above.\n\nStay inside these constraints: {developer_constraints}\n\nUnder 80 words. The file name is 2 to 5 lowercase words joined by underscores, describing the scene, with no extension, no dates, and no camera codes.";
 
-const PROMPT_MODEL = "gpt-5.6-luna";
-const IMAGE_MODEL = "gpt-image-2.5-flare";
+const PROMPT_MODEL = "gpt-6-luna";
+const IMAGE_MODEL = "gpt-image-2.5-sunburst";
 const IMAGE_QUALITY = "medium";
 // Partial frames keep bytes flowing; iOS WebKit drops requests that stay silent for about 60 s.
 const IMAGE_PARTIALS = 2;
