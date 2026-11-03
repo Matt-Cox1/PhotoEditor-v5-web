@@ -136,13 +136,21 @@ h2 {
   background: var(--accent);
   box-shadow: 0 0 0 0.2rem #b9e7ca22;
 }
-.auto-panel {
+.panel.auto-panel {
+  display: flex;
+  justify-content: flex-end;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+.panel.auto-panel.is-open {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 0.7rem 1rem;
-  border-color: #617469;
+  border: 1px solid #617469;
   background: linear-gradient(135deg, #172019, var(--panel));
+  padding: 1.15rem;
 }
 .auto-description,
 .auto-note {
@@ -761,7 +769,7 @@ canvas {
   .viewer-layout {
     grid-template-columns: 1fr;
   }
-  .auto-panel {
+  .panel.auto-panel.is-open {
     grid-template-columns: 1fr;
   }
   .auto-button {

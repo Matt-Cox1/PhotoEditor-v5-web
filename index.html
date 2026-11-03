@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PhotoEditor</title>
-  <link rel="stylesheet" href="./styles.css?v=denoise-21">
+  <link rel="stylesheet" href="./styles.css?v=auto-key-2">
 </head>
 <body>
   <main class="app-shell">
@@ -63,8 +63,8 @@
       <p id="photoMeta" class="meta">No photo selected</p>
     </section>
 
-    <section class="panel auto-panel">
-      <div>
+    <section id="autoPanel" class="panel auto-panel">
+      <div id="autoDetails" hidden>
         <p class="eyebrow">One-step workflow</p>
         <h2>Auto Edit</h2>
         <p class="auto-description">
@@ -84,14 +84,14 @@
           </span>
           <span class="key-warning">Stored in this browser only. Page scripts and browser extensions can read it.</span>
         </label>
+        <p class="auto-note">
+          Auto Edit sends a resized preview to OpenAI when a key is entered.
+          For local-only matching, load a reference image in Advanced controls.
+        </p>
       </div>
       <button id="autoEdit" class="button button-primary auto-button" type="button" disabled>
         Auto Edit
       </button>
-      <p class="auto-note">
-        Auto Edit sends a resized preview to OpenAI when a key is entered.
-        For local-only matching, load a reference image in Advanced controls.
-      </p>
     </section>
 
     <details id="advancedControls" class="advanced">
@@ -239,6 +239,6 @@
     </div>
     <p id="status" class="status" role="status">Load a photo to start.</p>
   </main>
-  <script type="module" src="./app.js?v=denoise-21"></script>
+  <script type="module" src="./app.js?v=auto-key-2"></script>
 </body>
 </html>

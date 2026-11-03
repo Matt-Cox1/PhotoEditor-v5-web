@@ -20,6 +20,8 @@ const OPENAI = "https://api.openai.com/v1";
 const API_KEY_STORAGE = "photoeditor.openai.apiKey.v1";
 
 const photoInput = document.getElementById("photo");
+const autoPanel = document.getElementById("autoPanel");
+const autoDetails = document.getElementById("autoDetails");
 const autoEditButton = document.getElementById("autoEdit");
 const advancedControls = document.getElementById("advancedControls");
 const menuOpen = document.getElementById("menuOpen");
@@ -666,14 +668,20 @@ async function checkOpenAiConnection() {
   setStatus("OpenAI connection is working. No photo was sent.");
 }
 
+function revealAutoKey() {
+  autoDetails.hidden = false;
+  autoPanel.classList.add("is-open");
+  apiKeyInput.focus();
+}
+
 async function autoEdit() {
   if (!state.photo) {
     throw new Error("Load a photo first.");
   }
   const hasKey = Boolean(apiKeyInput.value.trim());
   if (!hasKey && !state.reference) {
-    apiKeyInput.focus();
-    setStatus("Enter an OpenAI API key above, or add a reference image in Advanced controls before using Auto Edit.");
+    revealAutoKey();
+    setStatus("Enter an OpenAI API key, or add a reference image in Advanced controls before using Auto Edit.");
     return;
   }
   if (hasKey && !state.reference) {
