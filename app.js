@@ -1,11 +1,13 @@
 const PRESERVATION =
-  "Edit this exact photograph as a photographic color-and-light reference. Preserve the camera viewpoint, aspect ratio, framing, geometry, every real subject, object, facial identity, texture and detail. Do not add, remove, move or invent anything. Keep every subject silhouette, limb, facial feature and background landmark at exactly its input position; do not reconstruct anatomy or change poses. Do not add text, borders, new light sources or artificial sky detail. Use only changes achievable with white balance, exposure, curves, color, and local contrast. Keep real texture. A strong grade is welcome. Halos, neon color, and an HDR glow are not.";
+  "Color-grade the attached photograph. Do not generate a new photograph. Every person, tree, rock, and patch of ground stays in the same place, at the same size, in the same pose and clothing. Do not redraw faces, bark, needles, or the sky. Change only white balance, exposure, the curve, and color.";
+
+const GRADE_LOCK = "Stop. Leave every object where it is.";
 
 const DEFAULT_INTENT =
-  "No look was specified. Finish this exact photograph: correct what is actually wrong in its light and color, give the subject weight, and let the colors that belong in the frame read clearly. Commit to the grade this picture needs. A near-copy of the input is a failed result.";
+  "No look was specified. Correct the color and light that are actually wrong. Keep the photograph recognizable. A redrawn scene is a failed result.";
 
 const PROMPT_WRITER =
-  "You write one image-edit prompt for the supplied photograph. A later step can follow only color, exposure, curves, and mid-frequency contrast on the original pixels. It cannot add texture, objects, weather, or a new crop, so the prompt must not ask for those.\n\nStudy the photograph and the measured facts. Name the subject and the light you see. Name the main thing holding the picture back. Then prescribe the grade in concrete terms: white balance direction, exposure, the shape of the curve, which colors to strengthen, which to quiet, and whether the subject should separate from the ground.\n\nAdapt the grade to this frame. A bird, a night street, snow, and a portrait do not share a recipe. Do not default to warmer, more contrast, and more saturation.\n\nIf the user wrote a desired look, carry it out fully, including bold color and contrast. If they did not, still make a committed finish.\n\nStay inside these constraints: {developer_constraints}\n\nThe prompt is under 220 words. The file name is 2 to 5 lowercase words joined by underscores, describing the scene, with no extension, no dates, and no camera codes.";
+  "You write a color grade for the attached photograph. An image editor applies your words to that photo. Vivid instructions about people, trees, and texture make it repaint the picture, so those words must not appear in the grade.\n\nWrite only the grade. Do not describe the scene. Do not mention people, faces, clothing, poses, bark, texture, sharpness, or separating a subject from the background. Do not ask for a new crop, weather, or objects. Do not copy the constraints into the grade.\n\nUse the measured facts. Name the color problem in one sentence. Then give the correction: white balance direction, exposure, the shape of the curve, hues to strengthen, and hues to quiet. If the frame is already warm, do not add warmth. If the tonal range is already wide, do not stretch it.\n\nIf the user wrote a desired look, follow it. If they did not, correct the real cast and leave the photograph recognizable.\n\nStay inside these constraints: {developer_constraints}\n\nUnder 90 words. The file name is 2 to 5 lowercase words joined by underscores, describing the scene, with no extension, no dates, and no camera codes.";
 
 const PROMPT_MODEL = "gpt-5.6-luna";
 const IMAGE_MODEL = "gpt-image-2.5-flare";
@@ -1419,9 +1421,8 @@ async function writePrompt(png, intent, key, raster) {
     }
     const requested = intent.trim();
     const intentSection = requested ? `\n\nUser desired look (verbatim):\n${requested}` : "";
-    const genreSection = facts ? `\n\n${facts.constraints}` : "";
     return {
-      prompt: `${PRESERVATION}${genreSection}${intentSection}\n\nPhotographic treatment:\n${photographic}`,
+      prompt: `${PRESERVATION}\n\nGrade:\n${photographic}${intentSection}\n\n${GRADE_LOCK}`,
       suggestedFileName: sanitizeFileName(payload.file_name),
     };
   }
