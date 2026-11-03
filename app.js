@@ -1,13 +1,13 @@
 const PRESERVATION =
-  "Color-grade the attached photograph. Do not generate a new photograph. Every person, tree, rock, and patch of ground stays in the same place, at the same size, in the same pose and clothing. Do not redraw faces, bark, needles, or the sky. Change only white balance, exposure, the curve, and color.";
+  "Color-grade the attached photograph. Do not generate a new photograph. Every person, tree, rock, and patch of ground stays in the same place, at the same size, in the same pose and clothing. Do not redraw faces, bark, needles, or the sky. Change only white balance, exposure, the curve, and color. The result must look finished: open light and color with a point of view. A darker, grayer, or flatter picture is a failed edit.";
 
-const GRADE_LOCK = "Stop. Leave every object where it is.";
+const GRADE_LOCK = "Stop. Leave every object where it is. Keep the light open and the color alive.";
 
 const DEFAULT_INTENT =
-  "No look was specified. Correct the color and light that are actually wrong. Keep the photograph recognizable. A redrawn scene is a failed result.";
+  "No look was specified. Make a finished photograph someone would want to keep: open midtones, color with a point of view, and light that feels intentional. Do not darken the frame. Do not drain the color. A dark, gray, or flat result is a failure, and so is a redrawn scene.";
 
 const PROMPT_WRITER =
-  "You write a color grade for the attached photograph. An image editor applies your words to that photo. Vivid instructions about people, trees, and texture make it repaint the picture, so those words must not appear in the grade.\n\nWrite only the grade. Do not describe the scene. Do not mention people, faces, clothing, poses, bark, texture, sharpness, or separating a subject from the background. Do not ask for a new crop, weather, or objects. Do not copy the constraints into the grade.\n\nUse the measured facts. Name the color problem in one sentence. Then give the correction: white balance direction, exposure, the shape of the curve, hues to strengthen, and hues to quiet. If the frame is already warm, do not add warmth. If the tonal range is already wide, do not stretch it.\n\nIf the user wrote a desired look, follow it. If they did not, correct the real cast and leave the photograph recognizable.\n\nStay inside these constraints: {developer_constraints}\n\nUnder 90 words. The file name is 2 to 5 lowercase words joined by underscores, describing the scene, with no extension, no dates, and no camera codes.";
+  "You write a color grade for the attached photograph. An image editor applies your words to that photo. It overshoots. 'Lower the exposure a little' and 'quiet the saturation' become a dark, bland picture. Do not ask for those.\n\nWrite a grade that looks better than the input: clearer light, midtones that open, and color that belongs. Name the look in plain words. Do not use stop values, 'subtle,' 'restrained,' or 'nudge.'\n\nDo not describe the scene. Do not mention people, faces, clothing, poses, bark, texture, sharpness, or separating a subject from the background. Those words make the editor repaint the photo. Do not ask for a new crop, weather, or objects. Do not copy the constraints into the grade.\n\nIf the frame is warm, keep that warmth and give the other colors room. Do not cool the whole picture. If the tonal range is already wide, protect the ends and open the middle. Do not darken the frame to create contrast.\n\nIf the user wrote a desired look, follow it, and still keep the picture bright enough to look alive. If they did not, make the finished grade described above.\n\nStay inside these constraints: {developer_constraints}\n\nUnder 80 words. The file name is 2 to 5 lowercase words joined by underscores, describing the scene, with no extension, no dates, and no camera codes.";
 
 const PROMPT_MODEL = "gpt-5.6-luna";
 const IMAGE_MODEL = "gpt-image-2.5-flare";
@@ -1281,18 +1281,18 @@ function sceneFacts(raster) {
   ];
   if (blue - red > 0.04 && blue + 0.02 >= green) {
     cast = "The frame reads cool.";
-    rules.push("The frame reads cool. Warm only the colors that are actually cold, and leave colors that should stay blue.");
+    rules.push("The frame reads cool. Warm the light that is actually cold, and leave colors that should stay blue. Do not darken the frame to do it.");
   } else if (red - blue > 0.04 && red + 0.02 >= green) {
     cast = "The frame reads warm.";
-    rules.push("The frame already reads warm. Do not lay a second warm grade over the whole picture.");
+    rules.push("The warmth belongs in this frame. Keep it, and let the other colors read. Do not cool the whole picture and do not strip the reds and oranges.");
   } else if (green - Math.max(red, blue) > 0.04) {
     cast = "Green leads the frame.";
-    rules.push("Green leads the frame. Correct a cast only where it is a mistake, not where the subject is green.");
+    rules.push("Green leads the frame. Keep that green where the subject is green. Do not gray the picture to correct it.");
   }
   if (span < 0.4) {
     rules.push("The tonal range is compressed. Opening it is useful if the ends stay believable.");
   } else if (span > 0.82) {
-    rules.push("The tonal range is already wide. Hold the highlights and the shadows.");
+    rules.push("The ends are already far apart. Do not clip them, and do not darken the frame. Open the midtones.");
   }
   const ratio = raster.height ? raster.width / raster.height : 1;
   const orientation = ratio > 1.05 ? "landscape" : ratio < 0.95 ? "portrait (tall)" : "square";
